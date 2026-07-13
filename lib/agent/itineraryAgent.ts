@@ -280,11 +280,13 @@ Rules:
 1. Use the supplied content library as much as possible for cities, hotels, sights and activities.
 2. If the library is missing a needed entry, you may invent a plausible one with a vivid description.
 3. Pick a logical route from the start city to the end city. Distribute the total nights across cities in a sensible way (usually 1–3 nights per city).
-4. Use internal flight legs only when the distance between two cities is very large (> 500 km) or when the route jumps regions.
-5. Each day must have 2–5 sightseeing/activity entries with evocative descriptions.
-6. Descriptions should read like a luxury travel brochure: 2–5 sentences, rich and evocative.
-7. All text must be in the requested language (French or English). Keep French accents correct.
-8. The output must be valid JSON only — no markdown, no commentary.`;
+4. IMPORTANT: The trip has TOTAL NIGHTS = N. You must generate exactly N + 1 day blocks (Day 1 is arrival, then one day per remaining night, ending with the departure day).
+5. Use internal flight legs only when the distance between two cities is very large (> 500 km) or when the route jumps regions.
+6. Each day must have 2–5 sightseeing/activity entries with evocative descriptions.
+7. Each city must use exactly ONE hotel name. Do not combine multiple hotels with "and", ",", or "/". Pick a single real hotel name.
+8. Descriptions should read like a luxury travel brochure: 2–5 sentences, rich and evocative.
+9. All text must be in the requested language (French or English). Keep French accents correct.
+10. The output must be valid JSON only — no markdown, no commentary.`;
 }
 
 function buildUserPrompt(input: AgentTripInput, lib: LibraryContext): string {
@@ -357,9 +359,11 @@ Return a JSON object that exactly matches this schema:
 }
 
 Formatting rules:
+- Generate EXACTLY ${input.totalNights + 1} day blocks, labeled JOUR 1 through JOUR ${input.totalNights + 1}.
 - dayLabel must be "JOUR N" (or "DAY N" for English).
 - title for day 1: "ARRIVÉE À {city}" (or "ARRIVAL IN {city}"); for travel days between cities: "{from} – {to}"; for extra nights in the same city: "JOURNÉE À {city}" (or "FULL DAY IN {city}").
 - city, routeCities and flightLegs values must be UPPERCASE.
+- Each city must have exactly ONE hotel name. Do not combine names like "Hotel A and Hotel B".
 - weather line must include plausible temperature range, condition, sunrise and sunset for the date and city.
 - closing line must mention meals in the document language (e.g. "Dîner et nuit à l'hôtel.", "Breakfast and night at the hotel.")
 - descriptions should be vivid, 2–5 sentences, brochure style.
@@ -371,6 +375,18 @@ Produce the complete itinerary now.`;
 // ---------------------------------------------------------------------------
 // Defaults / validation
 // ---------------------------------------------------------------------------
+
+/**
+ * Clean up hotel names that accidentally combine multiple hotels.
+ * e.g. "Dera Rawatsar and Dilip Kothi and Fort Barli" → "Dera Rawatsar"
+ */
+function cleanHotelName(name: string): string {
+  if (!name) return name;
+  // Split on common conjunctions/punctuation and take the first segment
+  const separators = /\s+(?:and|et|und|or|ou|oder)\s+|\s*[,/]\s*/i;
+  const first = name.split(separators)[0].trim();
+  return first || name;
+}
 
 function normalizeItinerary(it: Itinerary, input: AgentTripInput): Itinerary {
   const days = (it.days || []).map((d, i) => {
@@ -386,7 +402,7 @@ function normalizeItinerary(it: Itinerary, input: AgentTripInput): Itinerary {
     }));
     const hotel: Hotel | undefined = d.hotel
       ? {
-          name: d.hotel.name || "Hôtel",
+          name: cleanHotelName(d.hotel.name) || "Hôtel",
           url: d.hotel.url,
           category: d.hotel.category,
           description: d.hotel.description,
