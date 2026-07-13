@@ -89,7 +89,7 @@ export async function getImage(opts: GetImageOptions): Promise<ImageRef | undefi
 
   // 3. AI generation
   try {
-    const { url, revisedPrompt } = await generateImageWithOpenRouter(prompt);
+    const { url } = await generateImageWithOpenRouter(prompt);
     let localPath: string | null = null;
     let finalUrl = url;
 
@@ -110,13 +110,13 @@ export async function getImage(opts: GetImageOptions): Promise<ImageRef | undefi
       }
     }
 
-    saveGeneratedImage(type, key, "ai", url, localPath, { caption, revisedPrompt });
+    saveGeneratedImage(type, key, "ai", url, localPath, { caption });
     return { url: finalUrl, caption };
   } catch (err) {
     // Try fallback prompt
     if (fallbackPrompt && fallbackPrompt !== prompt) {
       try {
-        const { url, revisedPrompt } = await generateImageWithOpenRouter(fallbackPrompt);
+        const { url } = await generateImageWithOpenRouter(fallbackPrompt);
         const base64 = url.startsWith("data:") ? url.split(",")[1] : null;
         let localPath: string | null = null;
         let finalUrl = url;
@@ -131,7 +131,7 @@ export async function getImage(opts: GetImageOptions): Promise<ImageRef | undefi
             finalUrl = `/${localPath}`;
           } catch { /* keep remote */ }
         }
-        saveGeneratedImage(type, key, "ai", url, localPath, { caption, revisedPrompt });
+        saveGeneratedImage(type, key, "ai", url, localPath, { caption });
         return { url: finalUrl, caption };
       } catch { /* fall through */ }
     }
@@ -140,14 +140,22 @@ export async function getImage(opts: GetImageOptions): Promise<ImageRef | undefi
   }
 }
 
+function titleCase(name: string): string {
+  return name
+    .split(/\s+/)
+    .map((w) => w.slice(0, 1).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 /** Convenience: get a watercolor-style city image. */
 export async function getWatercolorCityImage(cityName: string): Promise<ImageRef | undefined> {
-  const prompt = `A soft watercolor travel illustration of ${cityName}, India, warm pastel tones, dreamy atmosphere, no text, no labels, white background.`;
+  const display = titleCase(cityName);
+  const prompt = `A soft watercolor travel illustration of ${display}, India, warm pastel tones, dreamy atmosphere, no text, no labels, white background.`;
   return getImage({
     type: "watercolor",
     key: `watercolor:${cityName}`,
     prompt,
-    caption: cityName,
+    caption: display,
     skipWeb: true,
   });
 }
@@ -177,11 +185,12 @@ export async function getSightImage(title: string, cityName?: string): Promise<I
 /** Convenience: generate a route map image. */
 export async function getRouteMapImage(cities: string[]): Promise<ImageRef | undefined> {
   if (cities.length < 2) return undefined;
-  const route = cities.join(" → ");
-  const prompt = `A clean minimalist illustrated map of India showing a travel route connecting ${cities.join(", ")}, with dotted lines and small landmark icons for each city, soft watercolor style, no text labels, warm colors.`;
+  const displayCities = cities.map(titleCase);
+  const route = displayCities.join(" → ");
+  const prompt = `A clean minimalist illustrated map of India showing a travel route connecting ${displayCities.join(", ")}, with dotted lines and small landmark icons for each city, soft watercolor style, no text labels, warm colors.`;
   return getImage({
     type: "route",
-    key: cities.join("-"),
+    key: cities.join("-").toLowerCase(),
     prompt,
     caption: route,
     skipWeb: true,

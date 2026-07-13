@@ -346,6 +346,9 @@ function StepVisits({ state, setState, onNext, onBack }: {
   onNext: () => void;
   onBack: () => void;
 }) {
+  const [suggestions, setSuggestions] = useState<Record<number, string[]>>({});
+  const [loading, setLoading] = useState<Record<number, boolean>>({});
+
   const updateVisits = (idx: number, visits: string[]) => {
     setState((s) => ({
       ...s,
@@ -353,27 +356,90 @@ function StepVisits({ state, setState, onNext, onBack }: {
     }));
   };
 
+  const toggleVisit = (idx: number, visit: string) => {
+    const current = state.cityVisits[idx] || [];
+    const exists = current.map((v) => v.toLowerCase()).includes(visit.toLowerCase());
+    const next = exists
+      ? current.filter((v) => v.toLowerCase() !== visit.toLowerCase())
+      : [...current, visit];
+    updateVisits(idx, next);
+  };
+
+  useEffect(() => {
+    async function loadSuggestions() {
+      const nextLoading: Record<number, boolean> = {};
+      const nextSuggestions: Record<number, string[]> = {};
+      for (let i = 0; i < state.routeCities.length; i++) {
+        const city = state.routeCities[i];
+        nextLoading[i] = true;
+        try {
+          const res = await fetch(`/api/sights?city=${encodeURIComponent(city)}`);
+          const data = (await res.json()) as { sights?: string[] };
+          nextSuggestions[i] = data.sights || [];
+        } catch {
+          nextSuggestions[i] = [];
+        }
+        nextLoading[i] = false;
+      }
+      setSuggestions(nextSuggestions);
+      setLoading(nextLoading);
+    }
+    void loadSuggestions();
+  }, [state.routeCities]);
+
   return (
     <div className="space-y-5">
       <div>
         <h2 className="font-serif text-xl font-bold text-deep">Visits</h2>
-        <p className="text-sm text-ink/60">What will you visit in each city? Enter one visit per line.</p>
+        <p className="text-sm text-ink/60">Pick suggested sights for each city, or type your own.</p>
       </div>
 
       <div className="space-y-4">
-        {state.routeCities.map((city, i) => (
-          <SectionCard key={i} title={`${city} — ${state.cityNights[i] || 0} night${state.cityNights[i] === 1 ? "" : "s"}`}>
-            <TextArea
-              value={(state.cityVisits[i] || []).join("\n")}
-              onChange={(v) => updateVisits(i, v.split("\n").map((l) => l.trim()).filter(Boolean))}
-              rows={4}
-              placeholder={`e.g.\nTaj Mahal\nFort d'Agra\nItmad-ud-Daula`}
-            />
-            <p className="mt-2 text-xs text-ink/50">
-              {state.cityVisits[i]?.length || 0} visit{state.cityVisits[i]?.length === 1 ? "" : "s"} added
-            </p>
-          </SectionCard>
-        ))}
+        {state.routeCities.map((city, i) => {
+          const current = state.cityVisits[i] || [];
+          return (
+            <SectionCard key={i} title={`${city} — ${state.cityNights[i] || 0} night${state.cityNights[i] === 1 ? "" : "s"}`}>
+              <TextArea
+                value={current.join("\n")}
+                onChange={(v) => updateVisits(i, v.split("\n").map((l) => l.trim()).filter(Boolean))}
+                rows={3}
+                placeholder={`e.g.\nTaj Mahal\nAgra Fort`}
+              />
+
+              <div className="mt-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">Suggested sights</p>
+                {loading[i] ? (
+                  <p className="text-sm text-ink/50">Loading suggestions…</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {(suggestions[i] || []).map((sight) => {
+                      const selected = current.map((v) => v.toLowerCase()).includes(sight.toLowerCase());
+                      return (
+                        <button
+                          key={sight}
+                          type="button"
+                          onClick={() => toggleVisit(i, sight)}
+                          className={cn(
+                            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                            selected
+                              ? "border-deep bg-deep text-white"
+                              : "border-line bg-white text-ink hover:bg-cream"
+                          )}
+                        >
+                          {selected ? "✓ " : "+ "}{sight}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <p className="mt-2 text-xs text-ink/50">
+                {current.length} visit{current.length === 1 ? "" : "s"} added
+              </p>
+            </SectionCard>
+          );
+        })}
       </div>
 
       <div className="flex items-center justify-between pt-2">
@@ -393,6 +459,9 @@ function StepHotels({ state, setState, onNext, onBack }: {
   onNext: () => void;
   onBack: () => void;
 }) {
+  const [fetching, setFetching] = useState<Record<number, boolean>>({});
+  const [fetched, setFetched] = useState<Record<number, boolean>>({});
+
   const updateHotel = (idx: number, hotel: CityHotel) => {
     setState((s) => ({
       ...s,
@@ -400,34 +469,66 @@ function StepHotels({ state, setState, onNext, onBack }: {
     }));
   };
 
+  async function fetchHotelUrl(idx: number) {
+    const city = state.routeCities[idx];
+    const name = state.cityHotels[idx]?.name;
+    if (!city?.trim() || !name?.trim()) return;
+    setFetching((f) => ({ ...f, [idx]: true }));
+    try {
+      const res = await fetch(`/api/hotel/url?city=${encodeURIComponent(city)}&name=${encodeURIComponent(name)}`);
+      const data = (await res.json()) as { url?: string; source?: string };
+      if (data.url) {
+        updateHotel(idx, { ...state.cityHotels[idx], url: data.url });
+      }
+      setFetched((f) => ({ ...f, [idx]: true }));
+    } catch {
+      setFetched((f) => ({ ...f, [idx]: true }));
+    } finally {
+      setFetching((f) => ({ ...f, [idx]: false }));
+    }
+  }
+
   const canProceed = state.cityHotels.every((h) => h.name.trim());
 
   return (
     <div className="space-y-5">
       <div>
         <h2 className="font-serif text-xl font-bold text-deep">Hotels</h2>
-        <p className="text-sm text-ink/60">Enter the hotel for each city. The name will become a clickable link.</p>
+        <p className="text-sm text-ink/60">Enter the hotel name for each city. The website link will be fetched automatically.</p>
       </div>
 
       <div className="space-y-4">
         {state.routeCities.map((city, i) => (
           <SectionCard key={i} title={city}>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Hotel name" required>
-                <TextInput
-                  value={state.cityHotels[i]?.name || ""}
-                  onChange={(v) => updateHotel(i, { ...state.cityHotels[i], name: v })}
-                  placeholder="e.g. The Oberoi Amarvilas"
-                />
-              </Field>
-              <Field label="Hotel website URL">
-                <TextInput
-                  type="url"
-                  value={state.cityHotels[i]?.url || ""}
-                  onChange={(v) => updateHotel(i, { ...state.cityHotels[i], url: v })}
-                  placeholder="https://..."
-                />
-              </Field>
+            <Field label="Hotel name" required>
+              <TextInput
+                value={state.cityHotels[i]?.name || ""}
+                onChange={(v) => {
+                  updateHotel(i, { ...state.cityHotels[i], name: v, url: "" });
+                  setFetched((f) => ({ ...f, [i]: false }));
+                }}
+                placeholder="e.g. The Oberoi Amarvilas"
+              />
+            </Field>
+
+            <div className="mt-3 flex items-center gap-3">
+              <Button
+                onClick={() => void fetchHotelUrl(i)}
+                variant="secondary"
+                disabled={!state.cityHotels[i]?.name.trim() || fetching[i] || fetched[i]}
+              >
+                {fetching[i] ? "Finding link…" : fetched[i] ? "Link found" : "Find website link"}
+              </Button>
+              {state.cityHotels[i]?.url && (
+                <a
+                  href={state.cityHotels[i].url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm text-gold underline"
+                >
+                  {state.cityHotels[i].url}
+                </a>
+              )}
             </div>
           </SectionCard>
         ))}

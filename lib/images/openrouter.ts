@@ -15,22 +15,22 @@ export class MissingOpenRouterKeyError extends Error {
 }
 
 interface OpenRouterImageResponse {
-  data?: { url?: string; b64_json?: string; revised_prompt?: string }[];
+  data?: { b64_json?: string; url?: string; media_type?: string }[];
   error?: { message: string };
 }
 
 /**
- * Generate an image with OpenRouter and return a public URL or base64 data URL.
+ * Generate an image with OpenRouter and return a data URL or public URL.
  * The caller is responsible for downloading/saving the image.
  */
 export async function generateImageWithOpenRouter(
   prompt: string,
-  model = process.env.OPENROUTER_IMAGE_MODEL || "black-forest-labs/flux-schnell"
-): Promise<{ url: string; revisedPrompt?: string }> {
+  model = process.env.OPENROUTER_IMAGE_MODEL || "google/gemini-2.5-flash-image"
+): Promise<{ url: string }> {
   const key = apiKey();
   if (!key) throw new MissingOpenRouterKeyError();
 
-  const res = await fetch(`${OPENROUTER_BASE}/images/generations`, {
+  const res = await fetch(`${OPENROUTER_BASE}/images`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -55,10 +55,11 @@ export async function generateImageWithOpenRouter(
   if (!item) throw new Error("OpenRouter returned no image data.");
 
   if (item.b64_json) {
-    return { url: `data:image/png;base64,${item.b64_json}`, revisedPrompt: item.revised_prompt };
+    const mime = item.media_type || "image/png";
+    return { url: `data:${mime};base64,${item.b64_json}` };
   }
   if (item.url) {
-    return { url: item.url, revisedPrompt: item.revised_prompt };
+    return { url: item.url };
   }
   throw new Error("OpenRouter returned neither URL nor base64 image.");
 }

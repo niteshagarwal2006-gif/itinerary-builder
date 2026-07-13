@@ -6,7 +6,8 @@ import { getRouteMapImage, getSightImage, getWatercolorCityImage } from "@/lib/i
 import { checkSightOnDate } from "@/lib/closureDays";
 import { generateText, hasAiProvider } from "@/lib/ai/gemini";
 import { getDb } from "@/lib/db.server";
-import { recordRoute, recordHotel, recordSighting } from "@/lib/memory";
+import { recordRoute, recordHotel } from "@/lib/memory";
+import { addSuggestedSight } from "@/lib/citySights";
 
 export const runtime = "nodejs";
 
@@ -43,7 +44,7 @@ export interface ReviewNote {
 // Helpers
 // ---------------------------------------------------------------------------
 function normCity(name: string): string {
-  return name.trim();
+  return name.trim().toLowerCase();
 }
 
 function upperCity(name: string): string {
@@ -402,7 +403,7 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < route.length; i++) {
       const h = hotels[i];
       if (h?.name.trim()) recordHotel(normCity(route[i]), h.name.trim(), h.url.trim() || undefined);
-      for (const v of visits[i] ?? []) recordSighting(normCity(route[i]), v);
+      for (const v of visits[i] ?? []) addSuggestedSight(normCity(route[i]), v);
     }
   } catch (err) {
     console.error("Memory recording failed", err);
@@ -441,7 +442,8 @@ export async function POST(req: NextRequest) {
     const city = day.city.toLowerCase();
     if (!seenCities.has(city)) {
       seenCities.add(city);
-      day.cityImage = cityImages.get(day.city) || cityImages.get(normCity(day.city));
+      const image = cityImages.get(city) || cityImages.get(normCity(day.city)) || cityImages.get(day.city);
+      if (image) day.cityImage = image;
     }
   }
 
