@@ -66,22 +66,22 @@ function fit(img: ResolvedImage, maxW: number): { width: number; height: number 
   return { width: maxW, height: Math.round(h * ratio) };
 }
 
-function imageParagraph(
-  img: ResolvedImage,
-  maxW: number,
-  caption?: string
-): Paragraph[] {
+function imageRun(img: ResolvedImage, maxW: number): ImageRun {
   const { width, height } = fit(img, maxW);
   const opts: IImageOptions = {
     data: img.data,
     type: img.type,
     transformation: { width, height },
   };
+  return new ImageRun(opts);
+}
+
+function centeredImageParagraph(img: ResolvedImage, maxW: number, caption?: string): Paragraph[] {
   const out: Paragraph[] = [
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { before: 120, after: caption ? 40 : 160 },
-      children: [new ImageRun(opts)],
+      children: [imageRun(img, maxW)],
     }),
   ];
   if (caption) {
@@ -96,6 +96,60 @@ function imageParagraph(
     );
   }
   return out;
+}
+
+const noBorder = { style: BorderStyle.NONE, size: 0, color: "auto" } as const;
+
+/**
+ * Left-right layout: image on the left, text on the right.
+ * Used for watercolor city images and sight entries.
+ */
+function leftRightImageText(
+  img: ResolvedImage,
+  textBlocks: Paragraph[],
+  caption?: string
+): Table {
+  const imageCellContent: Paragraph[] = [
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: caption ? 40 : 0 },
+      children: [imageRun(img, 220)],
+    }),
+  ];
+  if (caption) {
+    imageCellContent.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({ text: caption, italics: true, size: 16, color: COLORS.gold, font: FONTS.body }),
+        ],
+      })
+    );
+  }
+
+  const imageCell = new TableCell({
+    width: { size: 35, type: WidthType.PERCENTAGE },
+    margins: { top: 60, bottom: 60, right: 120 },
+    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+    children: imageCellContent,
+  });
+
+  const textCell = new TableCell({
+    width: { size: 65, type: WidthType.PERCENTAGE },
+    margins: { top: 60, bottom: 60, left: 80 },
+    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+    verticalAlign: "center",
+    children: textBlocks.length ? textBlocks : [new Paragraph({ children: [] })],
+  });
+
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: {
+      top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
+      insideHorizontal: noBorder, insideVertical: noBorder,
+    },
+    rows: [new TableRow({ children: [imageCell, textCell] })],
+  });
 }
 
 // ---- Text helpers ----------------------------------------------------------
@@ -117,6 +171,23 @@ function link(text: string, url: string): ExternalHyperlink {
     children: [
       new TextRun({ text, style: "Hyperlink", font: FONTS.body, size: 21, color: COLORS.gold, underline: {} }),
     ],
+  });
+}
+
+function sectionHeading(text: string): Paragraph {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_1,
+    spacing: { before: 240, after: 120 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: COLORS.rule, space: 6 } },
+    children: [new TextRun({ text, font: FONTS.heading, size: 26, bold: true, color: COLORS.deep })],
+  });
+}
+
+function pageBreak(): Paragraph {
+  return new Paragraph({
+    spacing: { before: 0, after: 0 },
+    pageBreakBefore: true,
+    children: [],
   });
 }
 
@@ -145,10 +216,9 @@ function buildCover(it: Itinerary, imgs: Map<ImageRef, ResolvedImage>, S: DocStr
   );
 
   if (it.logo && imgs.has(it.logo)) {
-    out.push(...imageParagraph(imgs.get(it.logo)!, 260));
+    out.push(...centeredImageParagraph(imgs.get(it.logo)!, 260));
   }
 
-  // Trip summary line: PARIS → CHENNAI | dates | nights/days | DEPARTURE → HOME
   const ts = it.tripSummary;
   const segs: string[] = [];
   if (ts.origin && ts.arrivalCity) segs.push(`${ts.origin} → ${ts.arrivalCity}`);
@@ -175,7 +245,6 @@ function buildCover(it: Itinerary, imgs: Map<ImageRef, ResolvedImage>, S: DocStr
     );
   }
 
-  // ROUTE line (filter blanks so lettering matches the preview)
   const routeCities = it.routeCities.filter(Boolean);
   if (routeCities.length) {
     const labelled = routeCities
@@ -203,7 +272,7 @@ function buildCover(it: Itinerary, imgs: Map<ImageRef, ResolvedImage>, S: DocStr
   }
 
   if (it.routeMap && imgs.has(it.routeMap)) {
-    out.push(...imageParagraph(imgs.get(it.routeMap)!, 560));
+    out.push(...centeredImageParagraph(imgs.get(it.routeMap)!, 560));
   }
 
   return out;
@@ -213,6 +282,7 @@ function buildHighlights(it: Itinerary, S: DocStrings): (Paragraph)[] {
   const items = it.highlights.filter((h) => h.trim());
   if (!items.length) return [];
   const out: Paragraph[] = [
+    pageBreak(),
     sectionHeading(S.highlights),
   ];
   for (const h of items) {
@@ -228,27 +298,16 @@ function buildHighlights(it: Itinerary, S: DocStrings): (Paragraph)[] {
   return out;
 }
 
-function sectionHeading(text: string): Paragraph {
-  return new Paragraph({
-    heading: HeadingLevel.HEADING_1,
-    spacing: { before: 240, after: 120 },
-    border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: COLORS.rule, space: 6 } },
-    children: [new TextRun({ text, font: FONTS.heading, size: 26, bold: true, color: COLORS.deep })],
-  });
-}
-
 /** The day banner: a single-row, 3-cell table (jour/date • leg+distance • hotel). */
 function dayBanner(day: DayBlock): Table {
   const cellText = (runs: (TextRun | ExternalHyperlink)[]) =>
     new Paragraph({ children: runs, spacing: { after: 0 } });
 
-  // Cell 1 — JOUR / date
   const c1: Paragraph[] = [
     cellText([new TextRun({ text: day.dayLabel.toUpperCase(), bold: true, color: COLORS.white, font: FONTS.body, size: 22 })]),
   ];
   if (day.date) c1.push(cellText([new TextRun({ text: day.date.toUpperCase(), color: COLORS.white, font: FONTS.body, size: 18 })]));
 
-  // Cell 2 — leg title + distance (with maps link if available)
   const c2: Paragraph[] = [
     cellText([new TextRun({ text: day.title.toUpperCase(), bold: true, color: COLORS.white, font: FONTS.body, size: 20 })]),
   ];
@@ -260,12 +319,10 @@ function dayBanner(day: DayBlock): Table {
     c2.push(cellText([distRun]));
   }
 
-  // Cell 3 — hotel name (+ category)
   const c3: Paragraph[] = [];
   const hotelLine = [day.hotel?.name, day.hotel?.category].filter(Boolean).join(" · ");
   c3.push(cellText([new TextRun({ text: (hotelLine || day.city).toUpperCase(), bold: true, color: COLORS.white, font: FONTS.body, size: 18 })]));
 
-  const noBorder = { style: BorderStyle.NONE, size: 0, color: "auto" } as const;
   const mkCell = (children: Paragraph[], width: number) =>
     new TableCell({
       width: { size: width, type: WidthType.PERCENTAGE },
@@ -318,7 +375,7 @@ function buildDay(day: DayBlock, imgs: Map<ImageRef, ResolvedImage>, S: DocStrin
     out.push(new Paragraph({ spacing: { before: 120, after: 60 }, children: runs }));
   }
 
-  // Itinéraire (Google Maps directions) line
+  // Google Maps directions link
   const mapsUrl = legMapsUrl(day.leg);
   if (mapsUrl && day.leg) {
     const from = day.leg.fromCity, to = day.leg.toCity;
@@ -334,12 +391,20 @@ function buildDay(day: DayBlock, imgs: Map<ImageRef, ResolvedImage>, S: DocStrin
     );
   }
 
-  if (day.hotel?.image && imgs.has(day.hotel.image)) {
-    out.push(...imageParagraph(imgs.get(day.hotel.image)!, 300, day.hotel.image.caption));
+  // Watercolor city image with intro text on the right
+  if (day.cityImage && imgs.has(day.cityImage)) {
+    const introParas: Paragraph[] = [];
+    if (day.intro) introParas.push(bodyPara(day.intro, { spacingAfter: 80 }));
+    if (introParas.length) {
+      out.push(leftRightImageText(imgs.get(day.cityImage)!, introParas, day.cityImage.caption));
+    } else {
+      out.push(...centeredImageParagraph(imgs.get(day.cityImage)!, 360, day.cityImage.caption));
+    }
+  } else if (day.intro) {
+    out.push(bodyPara(day.intro));
   }
-  if (day.hotel?.description) out.push(bodyPara(day.hotel.description));
 
-  // Closure warnings (amber callout box)
+  // Closure warnings
   if (day.closureWarnings && day.closureWarnings.length > 0) {
     for (const warn of day.closureWarnings) {
       out.push(
@@ -359,8 +424,6 @@ function buildDay(day: DayBlock, imgs: Map<ImageRef, ResolvedImage>, S: DocStrin
     }
   }
 
-  if (day.intro) out.push(bodyPara(day.intro));
-
   for (const s of day.sights) out.push(...buildSight(s, imgs));
 
   if (day.closing) {
@@ -374,19 +437,27 @@ function buildDay(day: DayBlock, imgs: Map<ImageRef, ResolvedImage>, S: DocStrin
   return out;
 }
 
-function buildSight(s: Sight, imgs: Map<ImageRef, ResolvedImage>): (Paragraph)[] {
+function buildSight(s: Sight, imgs: Map<ImageRef, ResolvedImage>): (Paragraph | Table)[] {
   const titleText = s.enRoute
     ? `EN ROUTE : ${s.title.toUpperCase()}`
     : s.title.toUpperCase();
-  const out: Paragraph[] = [
-    new Paragraph({
-      spacing: { before: 160, after: 40 },
-      children: [new TextRun({ text: titleText, bold: true, font: FONTS.heading, size: 21, color: COLORS.deep })],
-    }),
-  ];
-  if (s.image && imgs.has(s.image)) out.push(...imageParagraph(imgs.get(s.image)!, 280, s.image.caption));
-  if (s.description) out.push(bodyPara(s.description));
-  return out;
+
+  const titlePara = new Paragraph({
+    spacing: { before: 160, after: 60 },
+    children: [new TextRun({ text: titleText, bold: true, font: FONTS.heading, size: 21, color: COLORS.deep })],
+  });
+
+  const descParas: Paragraph[] = [];
+  if (s.description) descParas.push(bodyPara(s.description));
+
+  if (s.image && imgs.has(s.image)) {
+    if (descParas.length) {
+      return [titlePara, leftRightImageText(imgs.get(s.image)!, descParas, s.image.caption)];
+    }
+    return [titlePara, ...centeredImageParagraph(imgs.get(s.image)!, 280, s.image.caption)];
+  }
+
+  return [titlePara, ...descParas];
 }
 
 // ---- Image collection ------------------------------------------------------

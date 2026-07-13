@@ -64,5 +64,28 @@ function initSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_sights_title ON sights(title);
     CREATE INDEX IF NOT EXISTS idx_activities_title ON activities(title);
     CREATE INDEX IF NOT EXISTS idx_cities_name ON cities(name);
+
+    -- AI-generated or fetched images, keyed by subject so we reuse them.
+    CREATE TABLE IF NOT EXISTS generated_images (
+      id          TEXT PRIMARY KEY,
+      type        TEXT NOT NULL,       -- 'city', 'sight', 'route', 'watercolor'
+      key         TEXT NOT NULL,       -- city name, sight title, route slug
+      source      TEXT NOT NULL,       -- 'ai', 'web', 'library'
+      url         TEXT,                -- remote URL
+      local_path  TEXT,                -- path under public/uploads
+      metadata    TEXT,                -- JSON
+      created_at  TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_generated_images_type_key ON generated_images(type, key);
+
+    -- Learning memory: user preferences, common routes, feedback.
+    CREATE TABLE IF NOT EXISTS memory (
+      id          TEXT PRIMARY KEY,
+      category    TEXT NOT NULL,       -- 'preference', 'route', 'hotel', 'sighting', 'feedback'
+      key         TEXT NOT NULL,
+      value       TEXT NOT NULL,       -- JSON
+      updated_at  TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_category_key ON memory(category, key);
   `);
 }

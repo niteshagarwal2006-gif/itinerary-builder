@@ -35,6 +35,30 @@ export function isClosedOn(sightTitle: string, weekday: number): boolean {
   return info?.closedDays.includes(weekday) ?? false;
 }
 
+export interface DateCheckResult {
+  closed: boolean;
+  weekday: number;
+  dayName: string;
+  note?: string;
+}
+
+/**
+ * Check whether a sight is closed on a specific calendar date.
+ * Returns the weekday number, day name, and closure note if closed.
+ */
+export function checkSightOnDate(sightTitle: string, isoDate: string): DateCheckResult {
+  const d = new Date(isoDate + "T00:00:00Z");
+  const weekday = d.getUTCDay();
+  const info = getClosureInfo(sightTitle);
+  const closed = info ? info.closedDays.includes(weekday) : false;
+  return {
+    closed,
+    weekday,
+    dayName: WEEKDAY_NAMES[weekday],
+    note: closed ? info?.note : undefined,
+  };
+}
+
 /** Day-of-week name (English) for display. */
 export const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 export const WEEKDAY_NAMES_FR = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
