@@ -68,6 +68,8 @@ export interface Sight {
   description: string;
   /** When true the title is prefixed "EN ROUTE :" in the document. */
   enRoute?: boolean;
+  /** Optional closure note shown after the description, e.g. "Closed on Fridays". */
+  closureNote?: string;
 }
 
 export interface DayBlock {

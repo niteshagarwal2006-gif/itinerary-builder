@@ -78,6 +78,14 @@ function initSchema(db: Database.Database): void {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_generated_images_type_key ON generated_images(type, key);
 
+    -- City coordinates for real distance and map calculations.
+    CREATE TABLE IF NOT EXISTS city_coords (
+      name        TEXT PRIMARY KEY,
+      lat         REAL NOT NULL,
+      lon         REAL NOT NULL,
+      updated_at  TEXT NOT NULL
+    );
+
     -- Learning memory: user preferences, common routes, feedback.
     CREATE TABLE IF NOT EXISTS memory (
       id          TEXT PRIMARY KEY,

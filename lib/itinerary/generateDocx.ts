@@ -449,6 +449,17 @@ function buildSight(s: Sight, imgs: Map<ImageRef, ResolvedImage>): (Paragraph | 
 
   const descParas: Paragraph[] = [];
   if (s.description) descParas.push(bodyPara(s.description));
+  if (s.closureNote) {
+    descParas.push(
+      new Paragraph({
+        spacing: { before: 60, after: 120 },
+        children: [
+          new TextRun({ text: "⚠ ", bold: true, color: "B8860B", font: FONTS.body, size: 19 }),
+          new TextRun({ text: s.closureNote, italics: true, color: "7A5800", font: FONTS.body, size: 19 }),
+        ],
+      })
+    );
+  }
 
   if (s.image && imgs.has(s.image)) {
     if (descParas.length) {

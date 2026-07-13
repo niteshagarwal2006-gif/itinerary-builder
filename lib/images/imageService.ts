@@ -35,10 +35,6 @@ function ensureDir(p: string): void {
   mkdirSync(path.dirname(p), { recursive: true });
 }
 
-function localPathFor(type: ImageType, key: string): string {
-  return path.join("uploads", "generated", type, `${slugify(key)}.png`);
-}
-
 async function downloadImage(url: string): Promise<Buffer> {
   const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!res.ok) throw new Error(`Failed to download image: ${res.status}`);
@@ -46,8 +42,8 @@ async function downloadImage(url: string): Promise<Buffer> {
   return Buffer.from(arrayBuffer);
 }
 
-async function saveLocalImage(type: ImageType, key: string, buffer: Buffer): Promise<string> {
-  const rel = localPathFor(type, key);
+async function saveLocalImage(type: ImageType, key: string, buffer: Buffer, ext = "png"): Promise<string> {
+  const rel = path.join("uploads", "generated", type, `${slugify(key)}.${ext}`);
   const abs = path.join(process.cwd(), "public", rel);
   ensureDir(abs);
   writeFileSync(abs, buffer);
@@ -180,6 +176,23 @@ export async function getSightImage(title: string, cityName?: string): Promise<I
     prompt: `A stunning travel photograph of ${subject}, India, clear composition, no text, no labels.`,
     caption: title,
   });
+}
+
+/** Download a user-selected external image (e.g. Pexels) and cache it as a sight image. */
+export async function saveSightImageFromUrl(url: string, title: string, cityName?: string): Promise<ImageRef | undefined> {
+  const key = cityName ? `${cityName}:${title}` : title;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return undefined;
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const ext = url.split("?")[0]?.split(".").pop()?.toLowerCase() === "png" ? "png" : "jpg";
+    const localPath = await saveLocalImage("sight", key, buffer, ext);
+    saveGeneratedImage("sight", key, "web", url, localPath, { caption: title });
+    return { url: `/${localPath}`, caption: title };
+  } catch {
+    return undefined;
+  }
 }
 
 /** Convenience: generate a route map image. */

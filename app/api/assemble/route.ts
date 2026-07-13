@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import type { DayBlock, Hotel, ImageRef, Itinerary, Lang, Sight, TripSummary } from "@/lib/itinerary/types";
 import { ensureCityDescription } from "@/lib/agent/cityDescriptions";
-import { getRouteMapImage, getSightImage, getWatercolorCityImage } from "@/lib/images/imageService";
+import { getSightImage, getWatercolorCityImage, saveSightImageFromUrl } from "@/lib/images/imageService";
+import { getRealRouteMapImage } from "@/lib/images/routeMap";
 import { checkSightOnDate } from "@/lib/closureDays";
 import { generateText, hasAiProvider } from "@/lib/ai/gemini";
 import { getDb } from "@/lib/db.server";
+import { geocodeCities, calculateDistanceBetween, type DistanceResult, type GeoCoord } from "@/lib/geo";
 import { recordRoute, recordHotel } from "@/lib/memory";
 import { addSuggestedSight } from "@/lib/citySights";
 
@@ -29,6 +31,7 @@ interface AssembleInput {
   visits: string[][];
   hotels: CityHotel[];
   includeWeather: boolean;
+  sightImages?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -108,39 +111,10 @@ function titleForDay(dayIndex: number, city: string, prevCity: string | null): s
 }
 
 // ---------------------------------------------------------------------------
-// Distance lookup (same table as before, kept minimal)
+// Distance formatting
 // ---------------------------------------------------------------------------
-interface LegInfo { km: number; hrs: number }
-
-const DISTANCES: Record<string, LegInfo> = {
-  "delhi-agra": { km: 233, hrs: 3.5 }, "agra-delhi": { km: 233, hrs: 3.5 },
-  "delhi-jaipur": { km: 280, hrs: 5 }, "jaipur-delhi": { km: 280, hrs: 5 },
-  "agra-jaipur": { km: 232, hrs: 4 }, "jaipur-agra": { km: 232, hrs: 4 },
-  "jaipur-jodhpur": { km: 345, hrs: 5 }, "jodhpur-jaipur": { km: 345, hrs: 5 },
-  "jaipur-udaipur": { km: 393, hrs: 6 }, "udaipur-jaipur": { km: 393, hrs: 6 },
-  "jaipur-jaisalmer": { km: 575, hrs: 9 }, "jaisalmer-jaipur": { km: 575, hrs: 9 },
-  "jaipur-bikaner": { km: 330, hrs: 5 }, "bikaner-jaipur": { km: 330, hrs: 5 },
-  "jodhpur-jaisalmer": { km: 285, hrs: 4.5 }, "jaisalmer-jodhpur": { km: 285, hrs: 4.5 },
-  "jodhpur-udaipur": { km: 250, hrs: 4 }, "udaipur-jodhpur": { km: 250, hrs: 4 },
-  "bikaner-jaisalmer": { km: 333, hrs: 5 }, "jaisalmer-bikaner": { km: 333, hrs: 5 },
-  "bikaner-jodhpur": { km: 250, hrs: 4 }, "jodhpur-bikaner": { km: 250, hrs: 4 },
-  "delhi-amritsar": { km: 450, hrs: 7 }, "amritsar-delhi": { km: 450, hrs: 7 },
-  "delhi-shimla": { km: 370, hrs: 8 }, "shimla-delhi": { km: 370, hrs: 8 },
-  "delhi-manali": { km: 540, hrs: 12 }, "manali-delhi": { km: 540, hrs: 12 },
-  "delhi-rishikesh": { km: 240, hrs: 5 }, "rishikesh-delhi": { km: 240, hrs: 5 },
-  "delhi-mussoorie": { km: 290, hrs: 6 }, "mussoorie-delhi": { km: 290, hrs: 6 },
-  "delhi-varanasi": { km: 840, hrs: 13 }, "varanasi-delhi": { km: 840, hrs: 13 },
-  "agra-varanasi": { km: 673, hrs: 10 }, "varanasi-agra": { km: 673, hrs: 10 },
-  "kochi-munnar": { km: 130, hrs: 4 }, "munnar-kochi": { km: 130, hrs: 4 },
-  "chennai-pondicherry": { km: 155, hrs: 3 }, "pondicherry-chennai": { km: 155, hrs: 3 },
-};
-
-function legDistance(from: string, to: string): LegInfo | null {
-  const key = `${from.toLowerCase().replace(/\s+/g, "")}-${to.toLowerCase().replace(/\s+/g, "")}`;
-  return DISTANCES[key] ?? null;
-}
-
-function formatLegText(info: LegInfo): string {
+function formatLegText(info: DistanceResult | null): string {
+  if (!info) return "";
   const totalMins = Math.round(info.hrs * 60);
   const h = Math.floor(totalMins / 60);
   const m = totalMins % 60;
@@ -164,7 +138,7 @@ async function generateVisitDescription(title: string, city: string, lang: Lang)
   }
 }
 
-async function generateTransition(from: string, to: string, info: LegInfo | null, lang: Lang): Promise<string> {
+async function generateTransition(from: string, to: string, info: DistanceResult | null, lang: Lang): Promise<string> {
   if (!hasAiProvider()) return "";
   const languageName = lang === "fr" ? "French" : lang === "en" ? "English" : "German";
   const leg = info ? ` (${formatLegText(info)})` : "";
@@ -237,15 +211,25 @@ interface PlannedDay {
   prevCity: string | null;
 }
 
-function planDays(input: AssembleInput): PlannedDay[] {
+function planDays(input: AssembleInput): { days: PlannedDay[]; duplicates: string[] } {
   const days: PlannedDay[] = [];
   let dayIndex = 0;
   const { route, nights, visits, hotels, startDate } = input;
+  const seenVisits = new Set<string>();
+  const duplicates: string[] = [];
 
   for (let cityIdx = 0; cityIdx < route.length; cityIdx++) {
     const city = normCity(route[cityIdx]);
     const n = nights[cityIdx] ?? 0;
-    const cityVisits = visits[cityIdx] ?? [];
+    const cityVisits = (visits[cityIdx] ?? []).filter((v) => {
+      const key = normCity(v);
+      if (seenVisits.has(key)) {
+        if (!duplicates.includes(v)) duplicates.push(v);
+        return false;
+      }
+      seenVisits.add(key);
+      return true;
+    });
     const hotel = hotels[cityIdx] ?? { name: "", url: "" };
 
     if (n === 0 && cityIdx !== route.length - 1) continue; // skip non-terminal 0-night cities
@@ -275,10 +259,15 @@ function planDays(input: AssembleInput): PlannedDay[] {
     }
   }
 
-  return days;
+  return { days, duplicates };
 }
 
-async function buildDayBlock(day: PlannedDay, input: AssembleInput, cityIntros: Map<string, string>): Promise<DayBlock> {
+async function buildDayBlock(
+  day: PlannedDay,
+  input: AssembleInput,
+  cityIntros: Map<string, string>,
+  cityCoords: Map<string, GeoCoord>
+): Promise<DayBlock> {
   const { lang, mealPlan, includeWeather } = input;
   const city = day.city;
   const cityUp = upperCity(city);
@@ -297,50 +286,57 @@ async function buildDayBlock(day: PlannedDay, input: AssembleInput, cityIntros: 
       }
     : undefined;
 
-  // Leg
+  // Leg + distance (real OSM/Haversine)
   let leg = undefined;
+  let legInfo: DistanceResult | null = null;
   if (day.prevCity && day.prevCity.toLowerCase() !== city.toLowerCase()) {
-    const info = legDistance(day.prevCity, city);
+    const fromCoord = cityCoords.get(day.prevCity);
+    const toCoord = cityCoords.get(city);
+    legInfo = fromCoord && toCoord ? await calculateDistanceBetween(fromCoord, toCoord) : null;
     leg = {
       fromCity: day.prevCity,
       toCity: city,
-      text: info ? formatLegText(info) : "",
+      text: formatLegText(legInfo),
+      mapsUrl: `https://www.google.com/maps/dir/${encodeURIComponent(day.prevCity)},+India/${encodeURIComponent(city)},+India`,
     };
   }
 
   // Intro
   let intro = "";
   if (isFirstDayInCity && day.prevCity && day.prevCity.toLowerCase() !== city.toLowerCase()) {
-    const info = legDistance(day.prevCity, city);
-    const transition = await generateTransition(day.prevCity, city, info, lang);
+    const transition = await generateTransition(day.prevCity, city, legInfo, lang);
     const cityDesc = cityIntros.get(city) || "";
     intro = transition ? (cityDesc ? `${transition}\n\n${cityDesc}` : transition) : cityDesc;
   } else if (isFirstDayInCity) {
     intro = cityIntros.get(city) || "";
   }
 
-  // Sights with descriptions and images
+  // Sights with descriptions, images and closure notes
   const sights: Sight[] = [];
   for (const visit of day.visits) {
     const desc = await ensureSightDescription(visit, city, lang);
-    const image = await getSightImage(visit, city);
+    const selectedUrl = input.sightImages?.[visit.toLowerCase().trim()];
+    let image: ImageRef | undefined;
+    if (selectedUrl) {
+      image = await saveSightImageFromUrl(selectedUrl, visit, city);
+    }
+    if (!image) {
+      image = await getSightImage(visit, city);
+    }
+    let closureNote: string | undefined;
+    if (day.isoDate) {
+      const check = checkSightOnDate(visit, day.isoDate);
+      if (check.closed) {
+        closureNote = `Closed on ${check.dayName}s. ${check.note ?? ""}`;
+      }
+    }
     sights.push({
       id: randomUUID(),
       title: visit.toUpperCase(),
       description: desc,
       image,
+      closureNote,
     });
-  }
-
-  // Closure warnings
-  const closureWarnings: string[] = [];
-  if (day.isoDate) {
-    for (const visit of day.visits) {
-      const check = checkSightOnDate(visit, day.isoDate);
-      if (check.closed) {
-        closureWarnings.push(`${visit} — closed on ${check.dayName}s. ${check.note ?? ""}`);
-      }
-    }
   }
 
   // Weather
@@ -363,7 +359,6 @@ async function buildDayBlock(day: PlannedDay, input: AssembleInput, cityIntros: 
     weather,
     intro: intro || undefined,
     sights,
-    closureWarnings: closureWarnings.length > 0 ? closureWarnings : undefined,
     closing: closingLine(mealPlan, lang),
   };
 }
@@ -410,7 +405,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Plan days
-  const plannedDays = planDays(input);
+  const { days: plannedDays, duplicates } = planDays(input);
   if (plannedDays.length === 0) {
     return NextResponse.json({ error: "No days could be planned from the route." }, { status: 400 });
   }
@@ -419,6 +414,7 @@ export async function POST(req: NextRequest) {
   const uniqueCities = Array.from(new Set(plannedDays.map((d) => d.city)));
   const cityIntros = new Map<string, string>();
   const cityImages = new Map<string, ImageRef | undefined>();
+  const cityCoords = new Map<string, GeoCoord>();
 
   await Promise.all(
     uniqueCities.map(async (city) => {
@@ -431,9 +427,14 @@ export async function POST(req: NextRequest) {
     })
   );
 
+  const geocoded = await geocodeCities(uniqueCities);
+  for (const { name, coord } of geocoded) {
+    cityCoords.set(name, coord);
+  }
+
   // Build day blocks
   const dayBlocks: DayBlock[] = await Promise.all(
-    plannedDays.map((day) => buildDayBlock(day, input, cityIntros))
+    plannedDays.map((day) => buildDayBlock(day, input, cityIntros, cityCoords))
   );
 
   // Attach watercolor city images to the first day of each city
@@ -461,8 +462,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Route map
-  const routeMap = await getRouteMapImage(uniqueCities);
+  // Route map (real OSM geography, reusing precomputed coords)
+  const routeMap = await getRealRouteMapImage(uniqueCities, cityCoords);
 
   // Trip summary
   const totalNights = nights.reduce((a, b) => a + (b || 0), 0);
@@ -489,7 +490,7 @@ export async function POST(req: NextRequest) {
     days: dayBlocks,
   };
 
-  const review = await reviewItinerary(itinerary, plannedDays);
+  const review = await reviewItinerary(itinerary, plannedDays, duplicates);
 
   return NextResponse.json({ itinerary, review });
 }
@@ -497,8 +498,16 @@ export async function POST(req: NextRequest) {
 // ---------------------------------------------------------------------------
 // Review
 // ---------------------------------------------------------------------------
-async function reviewItinerary(it: Itinerary, plannedDays: PlannedDay[]): Promise<ReviewNote[]> {
+async function reviewItinerary(it: Itinerary, plannedDays: PlannedDay[], duplicates: string[]): Promise<ReviewNote[]> {
   const notes: ReviewNote[] = [];
+
+  if (duplicates.length > 0) {
+    notes.push({
+      type: "info",
+      scope: "Overall",
+      message: `Duplicate visits removed: ${duplicates.join(", ")}`,
+    });
+  }
 
   for (const d of it.days) {
     for (const w of d.closureWarnings ?? []) {

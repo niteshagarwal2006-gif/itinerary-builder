@@ -27,6 +27,8 @@ interface WizardState {
   cityVisits: string[][];
   cityHotels: CityHotel[];
   includeWeather: boolean | null;
+  /** User-approved Pexels/library image URL per sight title (lowercased key). */
+  sightImages: Record<string, string>;
 }
 
 function emptyState(): WizardState {
@@ -49,6 +51,7 @@ function emptyState(): WizardState {
     cityVisits: [],
     cityHotels: [],
     includeWeather: null,
+    sightImages: {},
   };
 }
 
@@ -340,6 +343,16 @@ function StepRoute({ state, setState, onNext, onBack }: {
 // ---------------------------------------------------------------------------
 // Step 2: Visits per city
 // ---------------------------------------------------------------------------
+interface PexelsPhoto {
+  id: number;
+  thumb: string;
+  url: string;
+  full: string;
+  photographer: string;
+  photographerUrl: string;
+  alt: string;
+}
+
 function StepVisits({ state, setState, onNext, onBack }: {
   state: WizardState;
   setState: React.Dispatch<React.SetStateAction<WizardState>>;
@@ -348,6 +361,10 @@ function StepVisits({ state, setState, onNext, onBack }: {
 }) {
   const [suggestions, setSuggestions] = useState<Record<number, string[]>>({});
   const [loading, setLoading] = useState<Record<number, boolean>>({});
+  const [photos, setPhotos] = useState<Record<string, PexelsPhoto[]>>({});
+  const [photoLoading, setPhotoLoading] = useState<Record<string, boolean>>({});
+  const [photoError, setPhotoError] = useState<Record<string, string>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const updateVisits = (idx: number, visits: string[]) => {
     setState((s) => ({
@@ -364,6 +381,40 @@ function StepVisits({ state, setState, onNext, onBack }: {
       : [...current, visit];
     updateVisits(idx, next);
   };
+
+  async function loadPhotos(city: string, sight: string) {
+    const key = `${city}:${sight}`.toLowerCase();
+    if (photos[key]?.length || photoLoading[key]) return;
+    setPhotoLoading((p) => ({ ...p, [key]: true }));
+    setPhotoError((p) => ({ ...p, [key]: "" }));
+    try {
+      const query = encodeURIComponent(`${sight} ${city} India`);
+      const res = await fetch(`/api/photos/pexels?q=${query}`);
+      const data = (await res.json()) as { photos?: PexelsPhoto[]; error?: string };
+      if (!res.ok) {
+        setPhotoError((p) => ({ ...p, [key]: data.error ?? "Could not load photos." }));
+        setPhotos((p) => ({ ...p, [key]: [] }));
+      } else {
+        setPhotos((p) => ({ ...p, [key]: data.photos || [] }));
+      }
+    } catch {
+      setPhotoError((p) => ({ ...p, [key]: "Could not load photos." }));
+      setPhotos((p) => ({ ...p, [key]: [] }));
+    } finally {
+      setPhotoLoading((p) => ({ ...p, [key]: false }));
+      setExpanded((p) => ({ ...p, [key]: true }));
+    }
+  }
+
+  function selectPhoto(sight: string, url: string | null) {
+    setState((s) => ({
+      ...s,
+      sightImages: {
+        ...s.sightImages,
+        [sight.toLowerCase().trim()]: url ?? "",
+      },
+    }));
+  }
 
   useEffect(() => {
     async function loadSuggestions() {
@@ -391,7 +442,7 @@ function StepVisits({ state, setState, onNext, onBack }: {
     <div className="space-y-5">
       <div>
         <h2 className="font-serif text-xl font-bold text-deep">Visits</h2>
-        <p className="text-sm text-ink/60">Pick suggested sights for each city, or type your own.</p>
+        <p className="text-sm text-ink/60">Pick suggested sights for each city, or type your own. Then choose a Pexels photo for each visit.</p>
       </div>
 
       <div className="space-y-4">
@@ -433,6 +484,73 @@ function StepVisits({ state, setState, onNext, onBack }: {
                   </div>
                 )}
               </div>
+
+              {current.length > 0 && (
+                <div className="mt-4 space-y-3 rounded-lg border border-line bg-cream/20 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ink/60">Photos</p>
+                  {current.map((sight) => {
+                    const key = `${city}:${sight}`.toLowerCase();
+                    const chosen = state.sightImages[sight.toLowerCase().trim()];
+                    return (
+                      <div key={sight} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-ink">{sight}</span>
+                          <button
+                            type="button"
+                            onClick={() => loadPhotos(city, sight)}
+                            disabled={photoLoading[key]}
+                            className="text-xs font-medium text-gold underline hover:text-deep disabled:opacity-50"
+                          >
+                            {photoLoading[key] ? "Searching…" : chosen ? "Change photo" : "Find Pexels photo"}
+                          </button>
+                        </div>
+
+                        {chosen && (
+                          <div className="flex items-center gap-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- external Pexels thumbnails */}
+                            <img src={chosen} alt={sight} className="h-16 w-24 rounded object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => selectPhoto(sight, null)}
+                              className="text-xs text-red-600 underline"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+
+                        {expanded[key] && photos[key] && photos[key].length > 0 && (
+                          <div className="grid grid-cols-4 gap-2">
+                            {photos[key].map((photo) => (
+                              <button
+                                key={photo.id}
+                                type="button"
+                                onClick={() => selectPhoto(sight, photo.url)}
+                                className={cn(
+                                  "relative overflow-hidden rounded border-2 text-left transition-colors",
+                                  chosen === photo.url ? "border-deep" : "border-transparent hover:border-gold"
+                                )}
+                                title={`Photo by ${photo.photographer} on Pexels`}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element -- external Pexels thumbnails */}
+                                <img src={photo.thumb} alt={photo.alt || sight} className="h-16 w-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {expanded[key] && photos[key] && photos[key].length === 0 && !photoLoading[key] && (
+                          <p className="text-xs text-ink/50">No Pexels photos found.</p>
+                        )}
+
+                        {photoError[key] && (
+                          <p className="text-xs text-red-600">{photoError[key]}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               <p className="mt-2 text-xs text-ink/50">
                 {current.length} visit{current.length === 1 ? "" : "s"} added
@@ -745,6 +863,7 @@ export default function WizardPage() {
         visits: state.cityVisits,
         hotels: state.cityHotels,
         includeWeather: state.includeWeather ?? false,
+        sightImages: state.sightImages,
       };
       const res = await fetch("/api/assemble", {
         method: "POST",
