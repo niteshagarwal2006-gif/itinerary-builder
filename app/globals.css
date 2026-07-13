@@ -1,26 +1,58 @@
 @import "tailwindcss";
 
+@theme {
+  --color-ink: #1b2a2a;
+  --color-deep: #0f3d3e;
+  --color-deep-700: #155153;
+  --color-gold: #b8860b;
+  --color-gold-600: #a3780a;
+  --color-cream: #f4efe2;
+  --color-paper: #fbfaf6;
+  --color-line: #e4ddca;
+
+  --font-serif: Georgia, "Times New Roman", serif;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f4ec;
+  --foreground: #1b2a2a;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+input[type="text"],
+input[type="url"],
+input[type="number"],
+input[type="date"],
+textarea,
+select {
+  width: 100%;
+}
+
+textarea {
+  resize: vertical;
+}
+
+/* Thin, branded scrollbars in the editor panes. */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #cbbf9a transparent;
+}
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: #cbbf9a;
+  border-radius: 8px;
 }

@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Uploaded itinerary images (runtime)
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# Local content library (SQLite)
+/data/
+
+# Runtime / local files
+server.log
+.claude/
+
+# Bundled desktop app release
+release/

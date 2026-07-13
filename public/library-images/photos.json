@@ -1,0 +1,782 @@
+[
+ {
+  "src": "/library-images/photos/tea_plantation.jpg",
+  "title": "Tea Plantation",
+  "city": "Munnar"
+ },
+ {
+  "src": "/library-images/photos/agra_itmad_ud_daula.jpg",
+  "title": "AGRA Itmad Ud Daula",
+  "city": "Agra"
+ },
+ {
+  "src": "/library-images/photos/agra_taj_mahal_2.jpg",
+  "title": "Agra - Taj Mahal",
+  "city": "Agra"
+ },
+ {
+  "src": "/library-images/photos/agra_taj_mahal_3.jpg",
+  "title": "Agra - Taj Mahal",
+  "city": "Agra"
+ },
+ {
+  "src": "/library-images/photos/agra_taj_mahal_golden_hour.jpg",
+  "title": "Agra - Taj Mahal Golden Hour",
+  "city": "Agra"
+ },
+ {
+  "src": "/library-images/photos/agra_taj_mahal_sunset.jpg",
+  "title": "Agra - Taj Mahal Sunset",
+  "city": "Agra"
+ },
+ {
+  "src": "/library-images/photos/agra_taj_mahal.jpg",
+  "title": "Agra - Taj Mahal",
+  "city": "Agra"
+ },
+ {
+  "src": "/library-images/photos/agra_fatehpur_sikri.jpg",
+  "title": "Agra Fatehpur Sikri",
+  "city": "Agra"
+ },
+ {
+  "src": "/library-images/photos/amritsar_golden_temple.jpg",
+  "title": "Amritsar - Golden Temple",
+  "city": "Amritsar"
+ },
+ {
+  "src": "/library-images/photos/auroville_matrimandir_golden_dome.jpg",
+  "title": "Auroville - Matrimandir Golden Dome",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/bhutan_tigers_nest_monastery.jpg",
+  "title": "Bhutan - Tigers Nest Monastery",
+  "city": "Thimphu"
+ },
+ {
+  "src": "/library-images/photos/bikaner_haveli.jpg",
+  "title": "Bikaner Haveli",
+  "city": "Bikaner"
+ },
+ {
+  "src": "/library-images/photos/bikaner_junagarh.jpg",
+  "title": "Bikaner Junagarh",
+  "city": "Bikaner"
+ },
+ {
+  "src": "/library-images/photos/block_printing.jpg",
+  "title": "Block Printing",
+  "city": "Jaipur"
+ },
+ {
+  "src": "/library-images/photos/chandigarh.jpg",
+  "title": "Chandigarh",
+  "city": "Chandigarh"
+ },
+ {
+  "src": "/library-images/photos/cooking_class.jpg",
+  "title": "Cooking Class",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/darjeeling_tea_plantation_2.jpg",
+  "title": "Darjeeling - Tea Plantation",
+  "city": "Munnar"
+ },
+ {
+  "src": "/library-images/photos/delhi_auto_rickshaw.jpg",
+  "title": "Delhi - Auto Rickshaw",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/delhi_bangla_sahib_gurudwara.jpg",
+  "title": "Delhi - Bangla Sahib Gurudwara",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/delhi_humayuns_tomb.jpg",
+  "title": "Delhi - Humayuns Tomb",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/delhi_india_gate.jpg",
+  "title": "Delhi - India Gate",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/delhi_jama_masjid.jpg",
+  "title": "Delhi - Jama Masjid",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/delhi_lodi_garden_mughal_tombs_2.jpg",
+  "title": "Delhi - Lodi Garden Mughal Tombs",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/delhi_lodi_garden_mughal_tombs.jpg",
+  "title": "Delhi - Lodi Garden Mughal Tombs",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/delhi_lotus_temple_3.jpg",
+  "title": "Delhi - Lotus Temple",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/delhi_lotus_temple.jpg",
+  "title": "Delhi - Lotus Temple",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/delhi_qutub_minar.jpg",
+  "title": "Delhi - Qutub Minar",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/delhi_street_food.jpg",
+  "title": "Delhi - Street Food",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/delhi_abhaneri.jpg",
+  "title": "Delhi Abhaneri",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/delhi_akshardham.jpg",
+  "title": "Delhi Akshardham",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/delhi_rickshaw_ride.jpg",
+  "title": "Delhi Rickshaw Ride",
+  "city": "Delhi"
+ },
+ {
+  "src": "/library-images/photos/ganga.jpg",
+  "title": "Ganga",
+  "city": "Varanasi"
+ },
+ {
+  "src": "/library-images/photos/gurudwara.jpg",
+  "title": "Gurudwara",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/henna_one_hand.jpg",
+  "title": "Henna One hand",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/henna_two_hands.jpg",
+  "title": "Henna two hands",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/india_holi_festival.jpg",
+  "title": "India - Holi Festival",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/india_street_food_stall.jpg",
+  "title": "India - Street Food Stall",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/india_street_scene.jpg",
+  "title": "India - Street Scene",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/india_tour_coach_transport_2.jpg",
+  "title": "India Tour - Coach Transport",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/india_tour_coach_transport.jpg",
+  "title": "India Tour - Coach Transport",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/jaipur_amer_fort_8.jpg",
+  "title": "Jaipur - Amer Fort",
+  "city": "Jaipur"
+ },
+ {
+  "src": "/library-images/photos/jaipur_amer_fort.jpg",
+  "title": "Jaipur - Amer Fort",
+  "city": "Jaipur"
+ },
+ {
+  "src": "/library-images/photos/jaipur_city_palace.jpg",
+  "title": "Jaipur - City Palace",
+  "city": "Jaipur"
+ },
+ {
+  "src": "/library-images/photos/jaipur_flower_market.jpg",
+  "title": "Jaipur - Flower Market",
+  "city": "Jaipur"
+ },
+ {
+  "src": "/library-images/photos/jaipur_jantar_mantar.jpg",
+  "title": "Jaipur - Jantar Mantar",
+  "city": "Jaipur"
+ },
+ {
+  "src": "/library-images/photos/jaipur_block_printing.jpg",
+  "title": "Jaipur Block Printing",
+  "city": "Jaipur"
+ },
+ {
+  "src": "/library-images/photos/jaipur_galta_ji.jpg",
+  "title": "Jaipur Galta Ji",
+  "city": "Jaipur"
+ },
+ {
+  "src": "/library-images/photos/jaipur_hawa_mahal.jpg",
+  "title": "Jaipur Hawa Mahal",
+  "city": "Jaipur"
+ },
+ {
+  "src": "/library-images/photos/jaisalmer_rajasthani_women_in_desert.jpg",
+  "title": "Jaisalmer - Rajasthani Women in Desert",
+  "city": "Jaisalmer"
+ },
+ {
+  "src": "/library-images/photos/jaisalmer_gadisar_lake.jpg",
+  "title": "Jaisalmer Gadisar Lake",
+  "city": "Jaisalmer"
+ },
+ {
+  "src": "/library-images/photos/jodhpur_auto_tuk_tuk_ride.jpg",
+  "title": "Jodhpur - Auto Tuk tuk ride",
+  "city": "Jodhpur"
+ },
+ {
+  "src": "/library-images/photos/jodhpur_bazar_spices.jpg",
+  "title": "Jodhpur - Bazar Spices",
+  "city": "Jodhpur"
+ },
+ {
+  "src": "/library-images/photos/jodhpur_blue_city.jpg",
+  "title": "Jodhpur - Blue City",
+  "city": "Jodhpur"
+ },
+ {
+  "src": "/library-images/photos/jodhpur_jaswant_thada.jpg",
+  "title": "Jodhpur - Jaswant Thada",
+  "city": "Jodhpur"
+ },
+ {
+  "src": "/library-images/photos/jodhpur_safari.jpg",
+  "title": "Jodhpur - Safari",
+  "city": "Jodhpur"
+ },
+ {
+  "src": "/library-images/photos/jodhpur_zip_line.jpg",
+  "title": "Jodhpur - Zip Line",
+  "city": "Jodhpur"
+ },
+ {
+  "src": "/library-images/photos/jodhpur_blue_city_x.jpg",
+  "title": "Jodhpur Blue City",
+  "city": "Jodhpur"
+ },
+ {
+  "src": "/library-images/photos/jodhpur_mehrangarh_fort_evening.jpg",
+  "title": "Jodhpur Mehrangarh Fort Evening",
+  "city": "Jodhpur"
+ },
+ {
+  "src": "/library-images/photos/jodhpur_zipline.jpg",
+  "title": "Jodhpur Zipline",
+  "city": "Jodhpur"
+ },
+ {
+  "src": "/library-images/photos/jodhpur_blue_city_ladies.jpg",
+  "title": "Jodhpur blue city ladies",
+  "city": "Jodhpur"
+ },
+ {
+  "src": "/library-images/photos/kerala_ayurveda_shirodhara_treatment.jpg",
+  "title": "Kerala - Ayurveda Shirodhara Treatment",
+  "city": "Nattika"
+ },
+ {
+  "src": "/library-images/photos/kerala_ayurveda_spa.jpg",
+  "title": "Kerala - Ayurveda Spa",
+  "city": "Nattika"
+ },
+ {
+  "src": "/library-images/photos/kerala_backwater_heritage_resort.jpg",
+  "title": "Resort des backwaters",
+  "city": "Kumarakom"
+ },
+ {
+  "src": "/library-images/photos/kerala_backwaters_2.jpg",
+  "title": "Kerala - Backwaters",
+  "city": "Kumarakom"
+ },
+ {
+  "src": "/library-images/photos/kerala_backwaters_3.jpg",
+  "title": "Kerala - Backwaters",
+  "city": "Kumarakom"
+ },
+ {
+  "src": "/library-images/photos/kerala_backwaters_4.jpg",
+  "title": "Kerala - Backwaters",
+  "city": "Kumarakom"
+ },
+ {
+  "src": "/library-images/photos/kerala_backwaters_fishing.jpg",
+  "title": "Kerala - Backwaters Fishing",
+  "city": "Kumarakom"
+ },
+ {
+  "src": "/library-images/photos/kerala_houseboat_interior.jpg",
+  "title": "Kerala - Houseboat Interior",
+  "city": "Kumarakom"
+ },
+ {
+  "src": "/library-images/photos/kerala_periyar_lake_thekkady_2.jpg",
+  "title": "Kerala - Periyar Lake Thekkady",
+  "city": "Kochi"
+ },
+ {
+  "src": "/library-images/photos/kerala_traditional_architecture.jpg",
+  "title": "Kerala - Traditional Architecture",
+  "city": "Kochi"
+ },
+ {
+  "src": "/library-images/photos/kerala_tropical_resort_4.jpg",
+  "title": "Kerala - Tropical Resort",
+  "city": "Kochi"
+ },
+ {
+  "src": "/library-images/photos/kerala_tropical_resort_pool_2.jpg",
+  "title": "Kerala - Tropical Resort Pool",
+  "city": "Kochi"
+ },
+ {
+  "src": "/library-images/photos/kerala_tropical_resort_pool.jpg",
+  "title": "Piscine de resort tropical",
+  "city": "Kumarakom"
+ },
+ {
+  "src": "/library-images/photos/kerala_backwaters.jpg",
+  "title": "Kerala Backwaters",
+  "city": "Kumarakom"
+ },
+ {
+  "src": "/library-images/photos/kerala_food_on_banana_leaf.jpg",
+  "title": "Kerala Food on banana leaf",
+  "city": "Kochi"
+ },
+ {
+  "src": "/library-images/photos/kerala_house_boat.jpg",
+  "title": "Kerala House boat",
+  "city": "Kumarakom"
+ },
+ {
+  "src": "/library-images/photos/kerala_indian_home.jpg",
+  "title": "Kerala Indian Home",
+  "city": "Kochi"
+ },
+ {
+  "src": "/library-images/photos/kerala_kathakali.jpg",
+  "title": "Kerala Kathakali",
+  "city": "Kochi"
+ },
+ {
+  "src": "/library-images/photos/kochi_jew_synagogue.jpg",
+  "title": "Kochi - Jew Synagogue",
+  "city": "Kochi"
+ },
+ {
+  "src": "/library-images/photos/kochi_chinese_fishing_net.jpg",
+  "title": "Kochi Chinese fishing net",
+  "city": "Kochi"
+ },
+ {
+  "src": "/library-images/photos/madurai_night_ceremony.jpg",
+  "title": "Madurai - Night Ceremony",
+  "city": "Madurai"
+ },
+ {
+  "src": "/library-images/photos/madurai_meenakshi_temple.jpg",
+  "title": "Madurai Meenakshi Temple",
+  "city": "Madurai"
+ },
+ {
+  "src": "/library-images/photos/madurai_palace_interior.jpg",
+  "title": "Madurai Palace Interior",
+  "city": "Madurai"
+ },
+ {
+  "src": "/library-images/photos/madurai_palace.jpg",
+  "title": "Madurai Palace",
+  "city": "Madurai"
+ },
+ {
+  "src": "/library-images/photos/mandawa_haveli.jpg",
+  "title": "Mandawa Haveli",
+  "city": "Mandawa"
+ },
+ {
+  "src": "/library-images/photos/mysore_palace_interior_12.jpg",
+  "title": "Mysore - Palace Interior",
+  "city": "Mysore"
+ },
+ {
+  "src": "/library-images/photos/mysore_palace_interior_2.jpg",
+  "title": "Mysore - Palace Interior",
+  "city": "Mysore"
+ },
+ {
+  "src": "/library-images/photos/mysore_palace_interior_3.jpg",
+  "title": "Mysore - Palace Interior",
+  "city": "Mysore"
+ },
+ {
+  "src": "/library-images/photos/mysore_palace_interior_5.jpg",
+  "title": "Mysore - Palace Interior",
+  "city": "Mysore"
+ },
+ {
+  "src": "/library-images/photos/mysore_palace_interior.jpg",
+  "title": "Mysore - Palace Interior",
+  "city": "Mysore"
+ },
+ {
+  "src": "/library-images/photos/nepal_kathmandu_durbar_square_2.jpg",
+  "title": "Nepal - Kathmandu Durbar Square",
+  "city": "Kathmandu"
+ },
+ {
+  "src": "/library-images/photos/nepal_kathmandu_durbar_square_3.jpg",
+  "title": "Nepal - Kathmandu Durbar Square",
+  "city": "Kathmandu"
+ },
+ {
+  "src": "/library-images/photos/nepal_kathmandu_durbar_square.jpg",
+  "title": "Nepal - Kathmandu Durbar Square",
+  "city": "Kathmandu"
+ },
+ {
+  "src": "/library-images/photos/periyar_boating.jpg",
+  "title": "Periyar Boating",
+  "city": "Periyar"
+ },
+ {
+  "src": "/library-images/photos/periyar_spice_plantation.jpg",
+  "title": "Periyar Spice Plantation",
+  "city": "Periyar"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_colonial_building_2.jpg",
+  "title": "Basilique de Velankanni",
+  "city": "Velankanni"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_colonial_building_3.jpg",
+  "title": "Pondicherry - Colonial Building",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_colonial_building_4.jpg",
+  "title": "Pondicherry - Colonial Building",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_colonial_building_5.jpg",
+  "title": "Pondicherry - Colonial Building",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_colonial_building_6.jpg",
+  "title": "Pondicherry - Colonial Building",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_colonial_building_7.jpg",
+  "title": "Pondicherry - Colonial Building",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_french_colonial_2.jpg",
+  "title": "Jatayu Earth Center",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/pondicherry_french_colonial_3.jpg",
+  "title": "Pondicherry - French Colonial",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_french_colonial_4.jpg",
+  "title": "Pondicherry - French Colonial",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_french_colonial_5.jpg",
+  "title": "Pondicherry - French Colonial",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_french_colonial_6.jpg",
+  "title": "Pondicherry - French Colonial",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_french_colonial_architecture.jpg",
+  "title": "Pondicherry - French Colonial Architecture",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_yellow_colonial_building_2.jpg",
+  "title": "Pondicherry - Yellow Colonial Building",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_yellow_colonial_building_with_cycle_rickshaw.jpg",
+  "title": "Pondicherry - Yellow Colonial Building with Cycle Rickshaw",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/pondicherry_yellow_colonial_building.jpg",
+  "title": "Pondicherry - Yellow Colonial Building",
+  "city": "Pondichéry"
+ },
+ {
+  "src": "/library-images/photos/pushkar_hot_air_balloon_2.jpg",
+  "title": "Pushkar - Hot Air Balloon",
+  "city": "Pushkar"
+ },
+ {
+  "src": "/library-images/photos/pushkar_hot_air_balloon_3.jpg",
+  "title": "Pushkar - Hot Air Balloon",
+  "city": "Pushkar"
+ },
+ {
+  "src": "/library-images/photos/pushkar_hot_air_balloon.jpg",
+  "title": "Pushkar - Hot Air Balloon",
+  "city": "Pushkar"
+ },
+ {
+  "src": "/library-images/photos/rajasthan_craft_and_puppet_market_2.jpg",
+  "title": "Rajasthan - Craft and Puppet Market",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/rajasthan_craft_and_puppet_market_3.jpg",
+  "title": "Rajasthan - Craft and Puppet Market",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/rajasthan_craft_and_puppet_market.jpg",
+  "title": "Rajasthan - Craft and Puppet Market",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/rajasthan_culture_2.jpg",
+  "title": "Rajasthan - Culture",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/rajasthan_traditional_dance_and_costume.jpg",
+  "title": "Rajasthan - Traditional Dance and Costume",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/rajasthan_local_man.jpg",
+  "title": "Rajasthan local man",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/ranthambore_fort_2.jpg",
+  "title": "Ranthambore - Fort",
+  "city": "Ranthambore"
+ },
+ {
+  "src": "/library-images/photos/ranthambore_fort_3.jpg",
+  "title": "Ranthambore - Fort",
+  "city": "Ranthambore"
+ },
+ {
+  "src": "/library-images/photos/ranthambore_fort_4.jpg",
+  "title": "Ranthambore - Fort",
+  "city": "Ranthambore"
+ },
+ {
+  "src": "/library-images/photos/ranthambore_fort_5.jpg",
+  "title": "Ranthambore - Fort",
+  "city": "Ranthambore"
+ },
+ {
+  "src": "/library-images/photos/ranthambore_fort_and_tiger_reserve.jpg",
+  "title": "Ranthambore - Fort and Tiger Reserve",
+  "city": "Ranthambore"
+ },
+ {
+  "src": "/library-images/photos/shekhawati_mandawa_painted_haveli_2.jpg",
+  "title": "Shekhawati - Mandawa Painted Haveli",
+  "city": "Mandawa"
+ },
+ {
+  "src": "/library-images/photos/shekhawati_mandawa_painted_haveli_3.jpg",
+  "title": "Shekhawati - Mandawa Painted Haveli",
+  "city": "Mandawa"
+ },
+ {
+  "src": "/library-images/photos/shekhawati_mandawa_painted_haveli_4.jpg",
+  "title": "Shekhawati - Mandawa Painted Haveli",
+  "city": "Mandawa"
+ },
+ {
+  "src": "/library-images/photos/shekhawati_mandawa_painted_haveli_5.jpg",
+  "title": "Shekhawati - Mandawa Painted Haveli",
+  "city": "Mandawa"
+ },
+ {
+  "src": "/library-images/photos/shekhawati_mandawa_painted_haveli.jpg",
+  "title": "Shekhawati - Mandawa Painted Haveli",
+  "city": "Mandawa"
+ },
+ {
+  "src": "/library-images/photos/sikkim_monastery.jpg",
+  "title": "Sikkim Monastery",
+  "city": "Gangtok"
+ },
+ {
+  "src": "/library-images/photos/sikkim.jpg",
+  "title": "Sikkim",
+  "city": "Gangtok"
+ },
+ {
+  "src": "/library-images/photos/south_tea_plantation.jpg",
+  "title": "South Tea Plantation",
+  "city": "Munnar"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_palace_2.jpg",
+  "title": "Udaipur - Lake Palace",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_palace.jpg",
+  "title": "Udaipur - Lake Palace",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_10.jpg",
+  "title": "Façade rajasthanie",
+  "city": null
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_11.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_12.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_13.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_14.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_15.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_16.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_17.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_18.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_19.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_2.jpg",
+  "title": "Yoga au bord du lac",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_20.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_3.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_4.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_5.jpg",
+  "title": "City Palace, Udaipur",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_6.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_7.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_8.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_9.jpg",
+  "title": "Udaipur - Lake Pichola",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/udaipur_lake_pichola_and_lake_palace_hotel.jpg",
+  "title": "Udaipur - Lake Pichola and Lake Palace Hotel",
+  "city": "Udaipur"
+ },
+ {
+  "src": "/library-images/photos/varanasi_river_ghats.jpg",
+  "title": "Varanasi - River Ghats",
+  "city": "Varanasi"
+ },
+ {
+  "src": "/library-images/photos/yoga_single.jpg",
+  "title": "Yoga Single",
+  "city": null
+ }
+]

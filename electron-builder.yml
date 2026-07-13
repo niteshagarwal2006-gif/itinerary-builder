@@ -1,0 +1,23 @@
+appId: com.orientexpress.itinerarybuilder
+productName: Itinerary Builder
+directories:
+  app: desktop-app
+  output: release
+  buildResources: build-res
+# Keep the Electron app itself tiny — the shell has zero npm dependencies.
+# (Without this, electron-builder walks up and packs the ROOT node_modules.)
+files:
+  - "!node_modules"
+# Seed data (first-run library DB + uploads). The Next server bundle is copied
+# by scripts/after-pack.cjs because extraResources drops node_modules.
+extraResources:
+  - from: build/seed
+    to: seed
+afterPack: scripts/after-pack.cjs
+mac:
+  category: public.app-category.productivity
+  icon: build-res/icon.icns
+  target:
+    - target: dir
+      arch: arm64
+npmRebuild: false

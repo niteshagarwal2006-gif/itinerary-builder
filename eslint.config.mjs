@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Build artifacts / bundled output that should not be linted.
+    "release/**",
+    "desktop-app/**",
+    // Standalone build scripts that intentionally use CommonJS.
+    "scripts/*.cjs",
   ]),
 ]);
 

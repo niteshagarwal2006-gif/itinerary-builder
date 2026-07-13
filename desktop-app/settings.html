@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Claude API Key</title>
+<style>
+  :root {
+    --deep: #0f3d3e; --ink: #1b2a2a; --cream: #f4efe2; --paper: #fbfaf6; --line: #e4ddca;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px; background: var(--paper); color: var(--ink);
+    font: 14px/1.5 -apple-system, "Helvetica Neue", sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+  h1 { font-family: Georgia, serif; font-size: 20px; color: var(--deep); margin: 0 0 6px; }
+  p  { margin: 0 0 16px; color: rgba(27,42,42,.65); font-size: 13px; }
+  input {
+    width: 100%; padding: 10px 12px; font-size: 13px; font-family: Menlo, monospace;
+    border: 1px solid var(--line); border-radius: 10px; background: white; color: var(--ink);
+    outline: none; -webkit-user-select: text; user-select: text;
+  }
+  input:focus { border-color: var(--deep); box-shadow: 0 0 0 3px rgba(15,61,62,.12); }
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 18px; }
+  button {
+    padding: 9px 18px; font-size: 13px; font-weight: 600; border-radius: 10px;
+    border: 1px solid var(--deep); cursor: pointer;
+  }
+  .primary { background: var(--deep); color: white; }
+  .primary:hover { background: #155153; }
+  .status { font-size: 12px; color: var(--deep); min-height: 16px; margin-left: 4px; }
+  a { color: var(--deep); }
+  .hint { font-size: 12px; color: rgba(27,42,42,.5); margin-top: 14px; }
+</style>
+</head>
+<body>
+  <h1>Claude API Key</h1>
+  <p>The wizard uses Claude to write city &amp; sight descriptions and review each program.
+     Paste your Anthropic API key — it is stored only on this Mac.</p>
+  <input id="key" type="password" placeholder="sk-ant-…" spellcheck="false" autofocus />
+  <div class="row">
+    <button class="primary" id="save">Save</button>
+    <span class="status" id="status"></span>
+  </div>
+  <div class="hint">
+    Get a key at <a href="#" id="console-link">console.anthropic.com</a> → API Keys.
+    Without a key the app still works, but descriptions must be written by hand.
+  </div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  window.itb.getApiKey().then((k) => { if (k) $("key").value = k; });
+  $("save").addEventListener("click", async () => {
+    await window.itb.saveApiKey($("key").value);
+    $("status").textContent = "Saved ✓";
+    setTimeout(() => window.close(), 700);
+  });
+  $("key").addEventListener("keydown", (e) => { if (e.key === "Enter") $("save").click(); });
+  $("console-link").addEventListener("click", (e) => {
+    e.preventDefault();
+    // Opened externally by the window-open handler in main.js.
+    window.open("https://console.anthropic.com/settings/keys");
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "itinerary-builder-desktop",
+  "productName": "Itinerary Builder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Travel itinerary studio — wizard, Claude AI, Word export (Orient Express format)",
+  "main": "main.js",
+  "author": "Orient Express"
+}
