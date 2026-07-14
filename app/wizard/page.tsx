@@ -1002,17 +1002,19 @@ function StepReview({ state, itinerary, review, onBack, onConfirm, onRestart }: 
 export default function WizardPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [state, setState] = useState<WizardState>(() => {
-    const initial = emptyState();
+  const [state, setState] = useState<WizardState>(emptyState());
+  const [assembling, setAssembling] = useState(false);
+
+  // Load saved language after hydration to avoid SSR/client mismatch.
+  useEffect(() => {
     try {
-      const saved = typeof window !== "undefined" ? window.localStorage.getItem("itb:pref-lang") : null;
+      const saved = window.localStorage.getItem("itb:pref-lang");
       if (saved && (saved === "fr" || saved === "en" || saved === "de")) {
-        initial.lang = saved as Lang;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setState((s) => ({ ...s, lang: saved as Lang }));
       }
     } catch { /* ignore */ }
-    return initial;
-  });
-  const [assembling, setAssembling] = useState(false);
+  }, []);
   const [error, setError] = useState("");
   const [review, setReview] = useState<ReviewNote[] | null>(null);
   const [itinerary, setItinerary] = useState<object | null>(null);
