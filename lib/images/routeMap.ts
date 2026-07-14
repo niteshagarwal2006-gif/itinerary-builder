@@ -1,5 +1,5 @@
 import "server-only";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import path from "node:path";
 import type { ImageRef } from "@/lib/itinerary/types";
 import { geocodeCities, type GeoCoord } from "@/lib/geo";
@@ -45,12 +45,17 @@ function titleCase(name: string): string {
     .join(" ");
 }
 
-function pinMarkerSvg(color = "#B8860B"): Buffer {
+function pinMarkerPath(color = "#B8860B"): string {
+  const rel = path.join("uploads", "generated", "route", `pin-${color.replace("#", "")}.svg`);
+  const abs = path.join(process.cwd(), "public", rel);
+  if (existsSync(abs)) return abs;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" viewBox="0 0 32 48">
     <path d="M16 0C7.2 0 0 7.2 0 16c0 12 16 32 16 32s16-20 16-32c0-8.8-7.2-16-16-16z" fill="${color}" stroke="#FFFFFF" stroke-width="2"/>
     <circle cx="16" cy="16" r="6" fill="#FFFFFF"/>
   </svg>`;
-  return Buffer.from(svg);
+  mkdirSync(path.dirname(abs), { recursive: true });
+  writeFileSync(abs, svg);
+  return abs;
 }
 
 async function renderStaticMapsRoute(cities: GeocodedCity[]): Promise<Buffer | null> {
@@ -65,7 +70,7 @@ async function renderStaticMapsRoute(cities: GeocodedCity[]): Promise<Buffer | n
     tileSubdomains: ["a", "b", "c"],
   });
 
-  const pin = pinMarkerSvg();
+  const pin = pinMarkerPath();
   for (const c of cities) {
     const coord: [number, number] = [c.coord.lon, c.coord.lat];
     map.addMarker({

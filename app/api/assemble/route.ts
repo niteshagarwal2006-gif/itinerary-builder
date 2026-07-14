@@ -529,52 +529,54 @@ async function buildDayBlock(
     intro = cityIntros.get(city) || "";
   }
 
-  // Sights with descriptions, images and closure notes
-  const sights: Sight[] = [];
-  for (const visit of day.visits) {
-    const desc = await ensureSightDescription(visit, city, lang);
-    const sightKey = `${city}:${visit}`.toLowerCase().trim();
-    const selectedUrl = input.sightImages?.[sightKey];
-    let image: ImageRef | undefined;
-    if (selectedUrl) {
-      image = await saveSightImageFromUrl(selectedUrl, visit, city);
-    }
-    if (!image) {
-      image = await getSightImage(visit, city);
-    }
-    let closureNote: string | undefined;
-    if (day.isoDate) {
-      const check = await checkSightOnDate(visit, day.isoDate, city, lang);
-      if (check.closed) {
-        closureNote = lang === "fr"
-          ? `Fermé le ${check.dayName.toLowerCase()}. ${check.note ?? ""}`
-          : lang === "de"
-          ? `Geschlossen am ${check.dayName}. ${check.note ?? ""}`
-          : `Closed on ${check.dayName}s. ${check.note ?? ""}`;
+  // Sights with descriptions, images and closure notes (parallel per day)
+  const sights: Sight[] = await Promise.all(
+    day.visits.map(async (visit, idx) => {
+      const desc = await ensureSightDescription(visit, city, lang);
+      const sightKey = `${city}:${visit}`.toLowerCase().trim();
+      const selectedUrl = input.sightImages?.[sightKey];
+      let image: ImageRef | undefined;
+      if (selectedUrl) {
+        image = await saveSightImageFromUrl(selectedUrl, visit, city);
       }
-    }
-    const slotIndex = day.visits.indexOf(visit) % 3;
-    const timeOfDay: import("@/lib/itinerary/types").TimeOfDay = slotIndex === 0 ? "morning" : slotIndex === 1 ? "afternoon" : "evening";
-    sights.push({
-      id: randomUUID(),
-      title: visit.toUpperCase(),
-      description: desc,
-      image,
-      closureNote,
-      timeOfDay,
-    });
-  }
+      if (!image) {
+        image = await getSightImage(visit, city);
+      }
+      let closureNote: string | undefined;
+      if (day.isoDate) {
+        const check = await checkSightOnDate(visit, day.isoDate, city, lang);
+        if (check.closed) {
+          closureNote = lang === "fr"
+            ? `Fermé le ${check.dayName.toLowerCase()}. ${check.note ?? ""}`
+            : lang === "de"
+            ? `Geschlossen am ${check.dayName}. ${check.note ?? ""}`
+            : `Closed on ${check.dayName}s. ${check.note ?? ""}`;
+        }
+      }
+      const slotIndex = idx % 3;
+      const timeOfDay: import("@/lib/itinerary/types").TimeOfDay = slotIndex === 0 ? "morning" : slotIndex === 1 ? "afternoon" : "evening";
+      return {
+        id: randomUUID(),
+        title: visit.toUpperCase(),
+        description: desc,
+        image,
+        closureNote,
+        timeOfDay,
+      };
+    })
+  );
 
-  // Activities with descriptions
-  const activities: Activity[] = [];
-  for (const act of day.activities) {
-    const desc = await ensureActivityDescription(act, city, lang);
-    activities.push({
-      id: randomUUID(),
-      title: act.toUpperCase(),
-      description: desc,
-    });
-  }
+  // Activities with descriptions (parallel per day)
+  const activities: Activity[] = await Promise.all(
+    day.activities.map(async (act) => {
+      const desc = await ensureActivityDescription(act, city, lang);
+      return {
+        id: randomUUID(),
+        title: act.toUpperCase(),
+        description: desc,
+      };
+    })
+  );
 
   // Weather
   let weather: string | undefined;

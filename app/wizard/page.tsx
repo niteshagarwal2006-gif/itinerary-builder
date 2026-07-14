@@ -57,16 +57,9 @@ function parseDate(v: string): string | undefined {
 }
 
 function emptyState(): WizardState {
-  let savedLang: Lang = "fr";
-  try {
-    const saved = window.localStorage.getItem("itb:pref-lang");
-    if (saved && (saved === "fr" || saved === "en" || saved === "de")) {
-      savedLang = saved as Lang;
-    }
-  } catch { /* ignore */ }
   return {
     client: "",
-    lang: savedLang,
+    lang: "fr",
     dates: "",
     startDate: "",
     mealPlan: { b: true, l: false, d: true },
@@ -1009,7 +1002,16 @@ function StepReview({ state, itinerary, review, onBack, onConfirm, onRestart }: 
 export default function WizardPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [state, setState] = useState<WizardState>(emptyState());
+  const [state, setState] = useState<WizardState>(() => {
+    const initial = emptyState();
+    try {
+      const saved = typeof window !== "undefined" ? window.localStorage.getItem("itb:pref-lang") : null;
+      if (saved && (saved === "fr" || saved === "en" || saved === "de")) {
+        initial.lang = saved as Lang;
+      }
+    } catch { /* ignore */ }
+    return initial;
+  });
   const [assembling, setAssembling] = useState(false);
   const [error, setError] = useState("");
   const [review, setReview] = useState<ReviewNote[] | null>(null);
@@ -1080,6 +1082,7 @@ export default function WizardPage() {
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-line border-t-deep mx-auto" />
           <p className="mt-4 font-semibold text-deep">Building your itinerary…</p>
           <p className="text-sm text-ink/50">AI is writing descriptions, transitions and finding images.</p>
+          <p className="mt-2 text-xs text-ink/40">First run can take 30–60 seconds while images are generated; subsequent runs reuse them.</p>
         </div>
       </div>
     );

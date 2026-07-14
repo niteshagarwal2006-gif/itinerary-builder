@@ -37,6 +37,9 @@ function ensureDir(p: string): void {
 }
 
 async function downloadImage(url: string): Promise<Buffer> {
+  if (typeof url !== "string") {
+    throw new TypeError(`downloadImage expected a string URL, received ${typeof url}`);
+  }
   const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!res.ok) throw new Error(`Failed to download image: ${res.status}`);
   const arrayBuffer = await res.arrayBuffer();
@@ -106,9 +109,19 @@ export async function getImage(opts: GetImageOptions): Promise<ImageRef | undefi
     }
   }
 
-  // 3. AI generation
+  // 3. AI generation with a timeout so one slow image doesn't block the whole itinerary
+  const IMAGE_TIMEOUT_MS = 12_000;
+  async function generateWithTimeout(p: string): Promise<{ url: string }> {
+    return Promise.race([
+      generateImageWithOpenRouter(p),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Image generation timed out")), IMAGE_TIMEOUT_MS)
+      ),
+    ]);
+  }
+
   try {
-    const { url } = await generateImageWithOpenRouter(prompt);
+    const { url } = await generateWithTimeout(prompt);
     let localPath: string | null = null;
     let finalUrl = url;
 
@@ -135,7 +148,7 @@ export async function getImage(opts: GetImageOptions): Promise<ImageRef | undefi
     // Try fallback prompt
     if (fallbackPrompt && fallbackPrompt !== prompt) {
       try {
-        const { url } = await generateImageWithOpenRouter(fallbackPrompt);
+        const { url } = await generateWithTimeout(fallbackPrompt);
         const base64 = url.startsWith("data:") ? url.split(",")[1] : null;
         let localPath: string | null = null;
         let finalUrl = url;
@@ -203,6 +216,10 @@ export async function getSightImage(title: string, cityName?: string): Promise<I
 
 /** Download a user-selected external image (e.g. Pexels) and cache it as a sight image. */
 export async function saveSightImageFromUrl(url: string, title: string, cityName?: string): Promise<ImageRef | undefined> {
+  if (typeof url !== "string") {
+    console.error("saveSightImageFromUrl expected a string URL, received", typeof url);
+    return undefined;
+  }
   const key = cityName ? `${cityName}:${title}` : title;
   const cacheKey = `sight:${key}`;
   const start = Date.now();
