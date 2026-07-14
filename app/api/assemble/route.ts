@@ -463,8 +463,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Route map (real OSM geography, reusing precomputed coords)
-  const routeMap = await getRealRouteMapImage(uniqueCities, cityCoords);
+  // Route map (real OSM geography, full ordered route including return legs)
+  const routeMap = await getRealRouteMapImage(route.map(normCity));
 
   // Trip summary
   const totalNights = nights.reduce((a, b) => a + (b || 0), 0);
