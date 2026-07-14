@@ -26,7 +26,7 @@ import {
 } from "docx";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type { ImageRef, Itinerary, DayBlock, Sight } from "./types";
+import type { Activity, ImageRef, Itinerary, DayBlock, Sight } from "./types";
 import { legMapsUrl } from "./types";
 import { staySegment } from "./format";
 import { docStringsFor, type DocStrings } from "../i18n/docStrings";
@@ -467,6 +467,19 @@ function buildDay(day: DayBlock, imgs: Map<ImageRef, ResolvedImage>, S: DocStrin
 
   for (const s of day.sights) out.push(...buildSight(s, imgs));
 
+  if (day.activities && day.activities.length > 0) {
+    out.push(
+      new Paragraph({
+        spacing: { before: 160, after: 80 },
+        border: { top: { style: BorderStyle.SINGLE, size: 6, color: COLORS.rule, space: 8 } },
+        children: [
+          new TextRun({ text: "Experiences", bold: true, font: FONTS.heading, size: 22, color: COLORS.deep }),
+        ],
+      })
+    );
+    for (const a of day.activities) out.push(...buildActivity(a));
+  }
+
   if (day.closing) {
     out.push(
       new Paragraph({
@@ -476,6 +489,27 @@ function buildDay(day: DayBlock, imgs: Map<ImageRef, ResolvedImage>, S: DocStrin
     );
   }
   return out;
+}
+
+function buildActivity(a: Activity): Paragraph[] {
+  const titlePara = new Paragraph({
+    spacing: { before: 120, after: 40 },
+    children: [
+      new TextRun({ text: "✦ ", color: COLORS.gold, font: FONTS.body, size: 21 }),
+      new TextRun({ text: a.title.toUpperCase(), bold: true, font: FONTS.heading, size: 20, color: COLORS.deep }),
+    ],
+  });
+
+  if (!a.description) return [titlePara];
+  return [
+    titlePara,
+    new Paragraph({
+      spacing: { after: 100 },
+      children: [
+        new TextRun({ text: a.description, font: FONTS.body, size: 20, color: COLORS.ink, italics: true }),
+      ],
+    }),
+  ];
 }
 
 function buildSight(s: Sight, imgs: Map<ImageRef, ResolvedImage>): (Paragraph | Table)[] {

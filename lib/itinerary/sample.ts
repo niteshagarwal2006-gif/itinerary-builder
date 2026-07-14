@@ -33,6 +33,7 @@ export const sampleItinerary: Itinerary = {
       intro:
         "Porte d'entrée du Sud de l'Inde, Chennai conjugue l'héritage colonial britannique, la ferveur de ses temples dravidiens et une vie culturelle d'une grande richesse. Capitale du Tamil Nadu, elle constitue un point de départ idéal pour votre voyage entre patrimoine chrétien et trésors de l'Inde du Sud.",
       sights: [],
+      activities: [],
       closing: "Nuit à l'hôtel.",
     },
     {
@@ -54,6 +55,7 @@ export const sampleItinerary: Itinerary = {
             "Fondée par les Franciscains portugais en 1516 et considérée comme la plus ancienne église de Chennai. Son architecture mêle styles portugais, gothique et baroque, et son intérieur orné de retables dorés en fait un lieu de dévotion mariale particulièrement émouvant.",
         },
       ],
+      activities: [],
       closing: "Dîner et nuit à l'hôtel.",
     },
     {
@@ -77,6 +79,7 @@ export const sampleItinerary: Itinerary = {
             "Balade en rickshaw dans la Ville Blanche, où les rues portent encore des noms français : rue Dumas, rue Romain-Rolland, rue Suffren… Villas coloniales aux façades ocre et bougainvilliers, hôtel de ville, statue de Dupleix et front de mer offrent une atmosphère unique.",
         },
       ],
+      activities: [],
       closing: "Dîner et nuit à l'hôtel.",
     },
   ],

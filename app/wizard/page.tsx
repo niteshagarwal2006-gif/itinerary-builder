@@ -25,6 +25,7 @@ interface WizardState {
   routeCities: string[];
   cityNights: number[];
   cityVisits: string[][];
+  cityActivities: string[][];
   cityHotels: CityHotel[];
   includeWeather: boolean | null;
   /** User-approved Pexels/library image URL per sight title (lowercased key). */
@@ -64,6 +65,7 @@ function emptyState(): WizardState {
     routeCities: [],
     cityNights: [],
     cityVisits: [],
+    cityActivities: [],
     cityHotels: [],
     includeWeather: null,
     sightImages: {},
@@ -238,6 +240,7 @@ function StepRoute({ state, setState, onNext, onBack }: {
         routeCities: cities,
         cityNights: cities.map((_, i) => (i === cities.length - 1 ? 0 : 1)),
         cityVisits: cities.map(() => []),
+        cityActivities: cities.map(() => []),
         cityHotels: cities.map(() => ({ name: "", url: "" })),
       });
     } catch {
@@ -311,6 +314,7 @@ function StepRoute({ state, setState, onNext, onBack }: {
               routeCities: cities,
               cityNights: cities.map((_, i) => (i === cities.length - 1 ? 0 : 1)),
               cityVisits: cities.map(() => []),
+              cityActivities: cities.map(() => []),
               cityHotels: cities.map(() => ({ name: "", url: "" })),
             });
           }}
@@ -388,9 +392,16 @@ function StepVisits({ state, setState, onNext, onBack }: {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const updateVisits = (idx: number, visits: string[]) => {
+    const seen = new Set<string>();
+    const unique = visits.filter((v) => {
+      const key = v.toLowerCase().trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     setState((s) => ({
       ...s,
-      cityVisits: s.cityVisits.map((v, i) => (i === idx ? visits : v)),
+      cityVisits: s.cityVisits.map((v, i) => (i === idx ? unique : v)),
     }));
   };
 
@@ -488,7 +499,7 @@ function StepVisits({ state, setState, onNext, onBack }: {
                   <p className="text-sm text-ink/50">Loading suggestions…</p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
-                    {(suggestions[i] || []).map((sight) => {
+                    {Array.from(new Set((suggestions[i] || []).map((s) => s.trim()))).map((sight) => {
                       const selected = current.map((v) => v.toLowerCase()).includes(sight.toLowerCase());
                       return (
                         <button
@@ -587,6 +598,126 @@ function StepVisits({ state, setState, onNext, onBack }: {
 
       <div className="flex items-center justify-between pt-2">
         <Button onClick={onBack} variant="ghost">← Back</Button>
+        <Button onClick={onNext} variant="primary">Next: Activities →</Button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Step 3: Activities
+// ---------------------------------------------------------------------------
+function StepActivities({ state, setState, onNext, onBack }: {
+  state: WizardState;
+  setState: React.Dispatch<React.SetStateAction<WizardState>>;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const [suggestions, setSuggestions] = useState<Record<number, string[]>>({});
+  const [loading, setLoading] = useState<Record<number, boolean>>({});
+
+  const updateActivities = (idx: number, activities: string[]) => {
+    const seen = new Set<string>();
+    const unique = activities.filter((v) => {
+      const key = v.toLowerCase().trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    setState((s) => ({
+      ...s,
+      cityActivities: s.cityActivities.map((a, i) => (i === idx ? unique : a)),
+    }));
+  };
+
+  const toggleActivity = (idx: number, activity: string) => {
+    const current = state.cityActivities[idx] || [];
+    const exists = current.map((v) => v.toLowerCase()).includes(activity.toLowerCase());
+    const next = exists
+      ? current.filter((v) => v.toLowerCase() !== activity.toLowerCase())
+      : [...current, activity];
+    updateActivities(idx, next);
+  };
+
+  useEffect(() => {
+    async function loadSuggestions() {
+      const nextLoading: Record<number, boolean> = {};
+      const nextSuggestions: Record<number, string[]> = {};
+      for (let i = 0; i < state.routeCities.length; i++) {
+        const city = state.routeCities[i];
+        nextLoading[i] = true;
+        try {
+          const res = await fetch(`/api/activities?city=${encodeURIComponent(city)}`);
+          const data = (await res.json()) as { activities?: string[] };
+          nextSuggestions[i] = data.activities || [];
+        } catch {
+          nextSuggestions[i] = [];
+        }
+        nextLoading[i] = false;
+      }
+      setSuggestions(nextSuggestions);
+      setLoading(nextLoading);
+    }
+    void loadSuggestions();
+  }, [state.routeCities]);
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="font-serif text-xl font-bold text-deep">Activities & Experiences</h2>
+        <p className="text-sm text-ink/60">Pick suggested experiences for each city, or type your own. AI will write their descriptions.</p>
+      </div>
+
+      <div className="space-y-4">
+        {state.routeCities.map((city, i) => {
+          const current = state.cityActivities[i] || [];
+          return (
+            <SectionCard key={i} title={`${city} — ${state.cityNights[i] || 0} night${state.cityNights[i] === 1 ? "" : "s"}`}>
+              <TextArea
+                value={current.join("\n")}
+                onChange={(v) => updateActivities(i, v.split("\n").map((l) => l.trim()).filter(Boolean))}
+                rows={3}
+                placeholder={`e.g.\nRickshaw ride in Old Delhi\nCooking class with local family`}
+              />
+
+              <div className="mt-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">Suggested experiences</p>
+                {loading[i] ? (
+                  <p className="text-sm text-ink/50">Loading suggestions…</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from(new Set((suggestions[i] || []).map((a) => a.trim()))).map((activity) => {
+                      const selected = current.map((v) => v.toLowerCase()).includes(activity.toLowerCase());
+                      return (
+                        <button
+                          key={activity}
+                          type="button"
+                          onClick={() => toggleActivity(i, activity)}
+                          className={cn(
+                            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                            selected
+                              ? "border-deep bg-deep text-white"
+                              : "border-line bg-white text-ink hover:bg-cream"
+                          )}
+                        >
+                          {selected ? "✓ " : "+ "}{activity}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <p className="mt-2 text-xs text-ink/50">
+                {current.length} experience{current.length === 1 ? "" : "s"} added
+              </p>
+            </SectionCard>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center justify-between pt-2">
+        <Button onClick={onBack} variant="ghost">← Back</Button>
         <Button onClick={onNext} variant="primary">Next: Hotels →</Button>
       </div>
     </div>
@@ -594,7 +725,7 @@ function StepVisits({ state, setState, onNext, onBack }: {
 }
 
 // ---------------------------------------------------------------------------
-// Step 3: Hotels
+// Step 4: Hotels
 // ---------------------------------------------------------------------------
 function StepHotels({ state, setState, onNext, onBack }: {
   state: WizardState;
@@ -871,7 +1002,7 @@ export default function WizardPage() {
   const [review, setReview] = useState<ReviewNote[] | null>(null);
   const [itinerary, setItinerary] = useState<object | null>(null);
 
-  const totalSteps = 6;
+  const totalSteps = 7;
 
   async function assemble() {
     setAssembling(true);
@@ -886,6 +1017,7 @@ export default function WizardPage() {
         route: state.routeCities,
         nights: state.cityNights,
         visits: state.cityVisits,
+        activities: state.cityActivities,
         hotels: state.cityHotels,
         includeWeather: state.includeWeather ?? false,
         sightImages: state.sightImages,
@@ -904,7 +1036,7 @@ export default function WizardPage() {
       setItinerary(data.itinerary);
       setReview(data.review ?? []);
       setAssembling(false);
-      setStep(5);
+      setStep(6);
     } catch {
       setError("Could not reach the server.");
       setAssembling(false);
@@ -981,7 +1113,7 @@ export default function WizardPage() {
           )}
 
           {step === 3 && (
-            <StepHotels
+            <StepActivities
               state={state}
               setState={setState}
               onNext={() => setStep(4)}
@@ -990,15 +1122,24 @@ export default function WizardPage() {
           )}
 
           {step === 4 && (
-            <StepWeather
+            <StepHotels
               state={state}
               setState={setState}
-              onNext={() => void assemble()}
+              onNext={() => setStep(5)}
               onBack={() => setStep(3)}
             />
           )}
 
           {step === 5 && (
+            <StepWeather
+              state={state}
+              setState={setState}
+              onNext={() => void assemble()}
+              onBack={() => setStep(4)}
+            />
+          )}
+
+          {step === 6 && (
             <StepReview
               state={state}
               itinerary={itinerary}

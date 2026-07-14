@@ -72,6 +72,14 @@ export interface Sight {
   closureNote?: string;
 }
 
+export interface Activity {
+  /** Stable identity for React keys and reordering. */
+  id?: string;
+  title: string;
+  description: string;
+  image?: ImageRef;
+}
+
 export interface DayBlock {
   /** Stable identity for React keys and reordering (backfilled if missing). */
   id?: string;
@@ -93,6 +101,8 @@ export interface DayBlock {
   /** Intro / city description paragraph(s). */
   intro?: string;
   sights: Sight[];
+  /** Experiences such as rickshaw rides, cooking classes, boat cruises. */
+  activities: Activity[];
   /** Closure-day alerts, e.g. ["⚠ Taj Mahal — closed on Fridays"]. */
   closureWarnings?: string[];
   /** Closing line, e.g. "Dîner et nuit à l'hôtel." */

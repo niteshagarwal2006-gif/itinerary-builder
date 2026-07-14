@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import type { DayBlock, Hotel, ImageRef, Itinerary, Lang, Sight, TripSummary } from "@/lib/itinerary/types";
+import type { Activity, DayBlock, Hotel, ImageRef, Itinerary, Lang, Sight, TripSummary } from "@/lib/itinerary/types";
 import { ensureCityDescription } from "@/lib/agent/cityDescriptions";
 import { getHighlightsCollageImage, getSightImage, getWatercolorCityImage, saveSightImageFromUrl } from "@/lib/images/imageService";
 import { getRealRouteMapImage } from "@/lib/images/routeMap";
 import { checkSightOnDate } from "@/lib/closureDays";
+import {
+  addSuggestedActivity,
+  getCachedActivityDescription,
+  saveActivityDescription,
+} from "@/lib/cityActivities";
 import { generateText, hasAiProvider } from "@/lib/ai/gemini";
 import { logActivity } from "@/lib/ai/log";
 import { getDb } from "@/lib/db.server";
@@ -30,6 +35,7 @@ interface AssembleInput {
   route: string[];
   nights: number[];
   visits: string[][];
+  activities: string[][];
   hotels: CityHotel[];
   includeWeather: boolean;
   sightImages?: Record<string, string>;
@@ -345,6 +351,58 @@ async function ensureSightDescription(title: string, city: string, lang: Lang): 
   return desc;
 }
 
+async function generateActivityDescription(title: string, city: string, lang: Lang): Promise<string> {
+  if (!hasAiProvider()) return "";
+  const languageName = lang === "fr" ? "French" : lang === "en" ? "English" : "German";
+  const system = "You are a luxury travel writer for the Indian subcontinent. Write concise, evocative descriptions.";
+  const prompt = `Write a 2-3 sentence description in ${languageName} for the activity "${title}" in ${city}, India, suitable for a high-end travel itinerary. Return only the description, no labels.`;
+  const cacheKey = `activity-desc:${lang}:${city}:${title}`;
+  const start = Date.now();
+  try {
+    const text = (await generateText(system, prompt)).trim();
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { title, city, lang, prompt },
+      output: { length: text.length, preview: text.slice(0, 200) },
+      durationMs: Date.now() - start,
+      status: "success",
+    });
+    return text;
+  } catch (err) {
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { title, city, lang, prompt },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    return "";
+  }
+}
+
+async function ensureActivityDescription(title: string, city: string, lang: Lang): Promise<string> {
+  const cached = getCachedActivityDescription(title, city, lang);
+  if (cached?.trim()) {
+    logActivity({
+      category: "text",
+      provider: "cache",
+      cacheKey: `activity-desc:${lang}:${city}:${title}`,
+      input: { title, city, lang },
+      output: { length: cached.length, preview: cached.slice(0, 200) },
+      savedTo: "activities",
+      status: "cached",
+    });
+    return cached;
+  }
+  const desc = await generateActivityDescription(title, city, lang);
+  if (desc) saveActivityDescription(title, city, lang, desc);
+  return desc;
+}
+
 // ---------------------------------------------------------------------------
 // Build itinerary
 // ---------------------------------------------------------------------------
@@ -355,29 +413,35 @@ interface PlannedDay {
   totalNightsInCity: number;
   hotel: CityHotel;
   visits: string[];
+  activities: string[];
   isoDate?: string;
   prevCity: string | null;
+}
+
+function dedupeStrings(items: string[], duplicates: string[]): string[] {
+  const seen = new Set<string>();
+  return items.filter((v) => {
+    const key = normCity(v);
+    if (!key || seen.has(key)) {
+      if (!duplicates.includes(v)) duplicates.push(v);
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 function planDays(input: AssembleInput): { days: PlannedDay[]; duplicates: string[] } {
   const days: PlannedDay[] = [];
   let dayIndex = 0;
-  const { route, nights, visits, hotels, startDate } = input;
-  const seenVisits = new Set<string>();
+  const { route, nights, visits, activities, hotels, startDate } = input;
   const duplicates: string[] = [];
 
   for (let cityIdx = 0; cityIdx < route.length; cityIdx++) {
     const city = normCity(route[cityIdx]);
     const n = nights[cityIdx] ?? 0;
-    const cityVisits = (visits[cityIdx] ?? []).filter((v) => {
-      const key = normCity(v);
-      if (seenVisits.has(key)) {
-        if (!duplicates.includes(v)) duplicates.push(v);
-        return false;
-      }
-      seenVisits.add(key);
-      return true;
-    });
+    const cityVisits = dedupeStrings(visits[cityIdx] ?? [], duplicates);
+    const cityActivities = dedupeStrings(activities[cityIdx] ?? [], duplicates);
     const hotel = hotels[cityIdx] ?? { name: "", url: "" };
 
     if (n === 0 && cityIdx !== route.length - 1) continue; // skip non-terminal 0-night cities
@@ -385,10 +449,15 @@ function planDays(input: AssembleInput): { days: PlannedDay[]; duplicates: strin
     const daysForCity = n === 0 && cityIdx === route.length - 1 ? 1 : n;
     const prevCity = cityIdx === 0 ? null : normCity(route[cityIdx - 1]);
 
-    // Distribute visits across days in this city
-    const perDay: string[][] = Array.from({ length: daysForCity }, () => []);
+    // Distribute visits and activities across days in this city
+    const perDayVisits: string[][] = Array.from({ length: daysForCity }, () => []);
     for (let i = 0; i < cityVisits.length; i++) {
-      perDay[i % daysForCity].push(cityVisits[i]);
+      perDayVisits[i % daysForCity].push(cityVisits[i]);
+    }
+
+    const perDayActivities: string[][] = Array.from({ length: daysForCity }, () => []);
+    for (let i = 0; i < cityActivities.length; i++) {
+      perDayActivities[i % daysForCity].push(cityActivities[i]);
     }
 
     for (let d = 0; d < daysForCity; d++) {
@@ -399,7 +468,8 @@ function planDays(input: AssembleInput): { days: PlannedDay[]; duplicates: strin
         nightInCity: d + 1,
         totalNightsInCity: daysForCity,
         hotel,
-        visits: perDay[d],
+        visits: perDayVisits[d],
+        activities: perDayActivities[d],
         isoDate,
         prevCity: d === 0 ? prevCity : null,
       });
@@ -492,6 +562,17 @@ async function buildDayBlock(
     });
   }
 
+  // Activities with descriptions
+  const activities: Activity[] = [];
+  for (const act of day.activities) {
+    const desc = await ensureActivityDescription(act, city, lang);
+    activities.push({
+      id: randomUUID(),
+      title: act.toUpperCase(),
+      description: desc,
+    });
+  }
+
   // Weather
   let weather: string | undefined;
   if (includeWeather && day.isoDate) {
@@ -512,6 +593,7 @@ async function buildDayBlock(
     weather,
     intro: intro || undefined,
     sights,
+    activities,
     closing: closingLine(mealPlan, lang),
   };
 }
@@ -527,7 +609,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { client, lang, route, nights, visits, hotels, mealPlan } = input;
+  const { client, lang, route, nights, visits, activities, hotels, mealPlan } = input;
 
   if (!client?.trim()) {
     return NextResponse.json({ error: "Client name is required." }, { status: 400 });
@@ -541,17 +623,21 @@ export async function POST(req: NextRequest) {
   if (!visits || visits.length !== route.length) {
     return NextResponse.json({ error: "Visits array must match route cities." }, { status: 400 });
   }
+  if (!activities || activities.length !== route.length) {
+    return NextResponse.json({ error: "Activities array must match route cities." }, { status: 400 });
+  }
   if (!hotels || hotels.length !== route.length) {
     return NextResponse.json({ error: "Hotels array must match route cities." }, { status: 400 });
   }
 
-  // Remember route, hotels, sights
+  // Remember route, hotels, sights and activities
   try {
     recordRoute(route.map(normCity));
     for (let i = 0; i < route.length; i++) {
       const h = hotels[i];
       if (h?.name.trim()) recordHotel(normCity(route[i]), h.name.trim(), h.url.trim() || undefined);
       for (const v of visits[i] ?? []) addSuggestedSight(normCity(route[i]), v);
+      for (const a of activities[i] ?? []) addSuggestedActivity(normCity(route[i]), a);
     }
   } catch (err) {
     console.error("Memory recording failed", err);

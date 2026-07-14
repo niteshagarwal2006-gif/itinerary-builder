@@ -21,6 +21,7 @@ export function emptyDay(index = 0): DayBlock {
     title: "",
     city: "",
     sights: [],
+    activities: [],
   };
 }
 
@@ -54,9 +55,9 @@ export function ensureItineraryIds(it: Itinerary): Itinerary {
       dayChanged = true;
       return { ...s, id: uid() };
     });
-    if (d.id && !dayChanged) return d;
+    if (d.id && !dayChanged && d.activities) return d;
     changed = true;
-    return { ...d, id: d.id ?? uid(), sights };
+    return { ...d, id: d.id ?? uid(), sights, activities: d.activities ?? [] };
   });
   return changed ? { ...it, days } : it;
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AvatarChatbot } from "@/components/AvatarChatbot";
 
 export const metadata: Metadata = {
   title: "Itinerary Builder",
@@ -13,7 +14,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <AvatarChatbot />
+      </body>
     </html>
   );
 }
