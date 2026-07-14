@@ -48,8 +48,16 @@ export default function Home() {
       {/* Header + toolbar */}
       <header className="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-5 py-3">
-          <div className="flex items-baseline gap-3">
-            <h1 className="font-serif text-xl font-bold text-deep">Itinerary Builder</h1>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element -- local logo asset */}
+              <img
+                src="/assets/orient-logo.jpg"
+                alt="Orient Express Travels & Tours"
+                className="h-10 w-auto rounded object-contain"
+              />
+              <h1 className="font-serif text-xl font-bold text-deep">Itinerary Builder</h1>
+            </Link>
             <Link
               href="/wizard"
               className="rounded-lg bg-deep px-3 py-1 text-sm font-semibold text-white hover:bg-deep/90"

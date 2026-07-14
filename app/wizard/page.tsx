@@ -1089,7 +1089,13 @@ export default function WizardPage() {
     <div className="flex min-h-screen flex-col bg-paper">
       <header className="sticky top-0 z-10 border-b border-line bg-paper/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-5 py-4">
-          <div className="flex items-baseline gap-3">
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element -- local logo asset */}
+            <img
+              src="/assets/orient-logo.jpg"
+              alt="Orient Express Travels & Tours"
+              className="h-9 w-auto rounded object-contain"
+            />
             <span className="font-serif text-xl font-bold text-deep">New Itinerary</span>
             <span className="hidden text-sm text-ink/50 sm:inline">Wizard</span>
           </div>
