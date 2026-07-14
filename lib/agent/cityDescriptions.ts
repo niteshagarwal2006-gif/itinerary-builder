@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db.server";
 import type { Lang } from "@/lib/itinerary/types";
 import { generateText } from "@/lib/ai/gemini";
+import { logActivity } from "@/lib/ai/log";
 
 function findCity(name: string, lang: Lang) {
   const row = getDb()
@@ -45,12 +46,25 @@ export async function ensureCityDescription(
   country = "India"
 ): Promise<string> {
   const cached = findCity(cityName, lang);
-  if (cached?.intro?.trim()) return cached.intro;
+  if (cached?.intro?.trim()) {
+    logActivity({
+      category: "text",
+      provider: "cache",
+      cacheKey: `city-intro:${lang}:${cityName}`,
+      input: { cityName, lang, country },
+      output: { length: cached.intro.length, preview: cached.intro.slice(0, 200) },
+      savedTo: "cities",
+      status: "cached",
+    });
+    return cached.intro;
+  }
 
   const languageName = lang === "fr" ? "French" : lang === "en" ? "English" : "German";
   const prompt = `Write a short, evocative travel introduction in ${languageName} for the city of ${cityName}, ${country}.
 It should be 2-3 sentences, suitable for a luxury travel itinerary, and capture the city's atmosphere and highlights.
 Return only the text, no markdown, no labels.`;
+  const cacheKey = `city-intro:${lang}:${cityName}`;
+  const start = Date.now();
 
   try {
     const text = await generateText(
@@ -60,10 +74,29 @@ Return only the text, no markdown, no labels.`;
     const intro = text.trim();
     if (intro) {
       upsertCity(cityName, country, intro, lang);
+      logActivity({
+        category: "text",
+        provider: "gemini",
+        cacheKey,
+        input: { cityName, lang, country, prompt },
+        output: { length: intro.length, preview: intro.slice(0, 200) },
+        savedTo: "cities",
+        durationMs: Date.now() - start,
+        status: "success",
+      });
       return intro;
     }
   } catch (err) {
     console.error("Failed to generate city description for", cityName, err);
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { cityName, lang, country, prompt },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
   }
 
   return "";

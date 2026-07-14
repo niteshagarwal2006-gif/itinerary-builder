@@ -86,6 +86,26 @@ function initSchema(db: Database.Database): void {
       updated_at  TEXT NOT NULL
     );
 
+    -- AI activity log: every AI/web call, what was generated, and where it was saved.
+    -- Used for audit, debugging, and to avoid repeating the same generation.
+    CREATE TABLE IF NOT EXISTS ai_activity_log (
+      id            TEXT PRIMARY KEY,
+      category      TEXT NOT NULL,     -- 'text', 'image', 'geocode', 'distance', 'hotel_url', 'sight_suggestions', 'route_suggestion', 'translate', 'verify', 'review'
+      provider      TEXT,              -- 'gemini', 'openrouter', 'anthropic', 'nominatim', 'osrm', 'pexels', 'web', 'cache'
+      cache_key     TEXT NOT NULL,     -- deterministic key for deduplication
+      input_hash    TEXT,              -- sha256 of normalized input
+      input_summary TEXT NOT NULL,     -- JSON of request params
+      output_summary TEXT,             -- JSON of result (truncated for large text/images)
+      saved_to      TEXT,              -- db table or file path where result is persisted
+      duration_ms   INTEGER,
+      status        TEXT NOT NULL DEFAULT 'success', -- 'success', 'error', 'cached'
+      error_message TEXT,
+      created_at    TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_activity_category ON ai_activity_log(category);
+    CREATE INDEX IF NOT EXISTS idx_ai_activity_cache_key ON ai_activity_log(cache_key);
+    CREATE INDEX IF NOT EXISTS idx_ai_activity_created_at ON ai_activity_log(created_at DESC);
+
     -- Learning memory: user preferences, common routes, feedback.
     CREATE TABLE IF NOT EXISTS memory (
       id          TEXT PRIMARY KEY,

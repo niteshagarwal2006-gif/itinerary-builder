@@ -6,6 +6,7 @@ import { getSightImage, getWatercolorCityImage, saveSightImageFromUrl } from "@/
 import { getRealRouteMapImage } from "@/lib/images/routeMap";
 import { checkSightOnDate } from "@/lib/closureDays";
 import { generateText, hasAiProvider } from "@/lib/ai/gemini";
+import { logActivity } from "@/lib/ai/log";
 import { getDb } from "@/lib/db.server";
 import { geocodeCities, calculateDistanceBetween, type DistanceResult, type GeoCoord } from "@/lib/geo";
 import { recordRoute, recordHotel } from "@/lib/memory";
@@ -131,9 +132,30 @@ async function generateVisitDescription(title: string, city: string, lang: Lang)
   const languageName = lang === "fr" ? "French" : lang === "en" ? "English" : "German";
   const system = "You are a luxury travel writer for the Indian subcontinent. Write concise, evocative descriptions.";
   const prompt = `Write a 2-3 sentence description in ${languageName} for "${title}" in ${city}, India, suitable for a high-end travel itinerary. Return only the description, no labels.`;
+  const cacheKey = `desc:${lang}:${city}:${title}`;
+  const start = Date.now();
   try {
-    return (await generateText(system, prompt)).trim();
-  } catch {
+    const text = (await generateText(system, prompt)).trim();
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { title, city, lang, prompt },
+      output: { length: text.length, preview: text.slice(0, 200) },
+      durationMs: Date.now() - start,
+      status: "success",
+    });
+    return text;
+  } catch (err) {
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { title, city, lang, prompt },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
     return "";
   }
 }
@@ -144,9 +166,30 @@ async function generateTransition(from: string, to: string, info: DistanceResult
   const leg = info ? ` (${formatLegText(info)})` : "";
   const system = "You are a luxury travel writer. Write a single smooth transition sentence.";
   const prompt = `Write one elegant ${languageName} sentence describing the road journey from ${from} to ${to}${leg}. Mention breakfast and arrival/check-in naturally. Return only the sentence.`;
+  const cacheKey = `transition:${lang}:${from}:${to}:${info?.km ?? 0}:${info?.hrs ?? 0}`;
+  const start = Date.now();
   try {
-    return (await generateText(system, prompt)).trim();
-  } catch {
+    const text = (await generateText(system, prompt)).trim();
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { from, to, lang, leg },
+      output: { length: text.length, preview: text.slice(0, 200) },
+      durationMs: Date.now() - start,
+      status: "success",
+    });
+    return text;
+  } catch (err) {
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { from, to, lang, leg },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
     return "";
   }
 }
@@ -157,9 +200,30 @@ async function generateWeatherLine(city: string, isoDate: string, lang: Lang): P
   const display = formatDateForDisplay(isoDate, lang);
   const system = "You are a travel assistant. Provide a short, plausible weather note.";
   const prompt = `Give a short ${languageName} weather forecast summary for ${city}, India on ${display} (around that time of year). Format like "MÉTÉO: DELHI | 8–24°C | sunny and pleasant". Return only the line.`;
+  const cacheKey = `weather:${lang}:${city}:${isoDate}`;
+  const start = Date.now();
   try {
-    return (await generateText(system, prompt)).trim();
-  } catch {
+    const text = (await generateText(system, prompt)).trim();
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { city, isoDate, lang },
+      output: { length: text.length, preview: text.slice(0, 200) },
+      durationMs: Date.now() - start,
+      status: "success",
+    });
+    return text;
+  } catch (err) {
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { city, isoDate, lang },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
     return "";
   }
 }
@@ -191,7 +255,18 @@ function saveSightDescription(title: string, city: string, lang: Lang, descripti
 
 async function ensureSightDescription(title: string, city: string, lang: Lang): Promise<string> {
   const cached = getCachedSight(title, city, lang);
-  if (cached?.trim()) return cached;
+  if (cached?.trim()) {
+    logActivity({
+      category: "text",
+      provider: "cache",
+      cacheKey: `desc:${lang}:${city}:${title}`,
+      input: { title, city, lang },
+      output: { length: cached.length, preview: cached.slice(0, 200) },
+      savedTo: "sights",
+      status: "cached",
+    });
+    return cached;
+  }
   const desc = await generateVisitDescription(title, city, lang);
   if (desc) saveSightDescription(title, city, lang, desc);
   return desc;
@@ -538,13 +613,34 @@ async function reviewItinerary(it: Itinerary, plannedDays: PlannedDay[], duplica
     "Flag unrealistic distances, missing must-sees, repeated sights, backtracking. Include one ok note if routing looks solid.";
   const prompt = `Review this routing:\n${daysSummary}`;
 
+  const cacheKey = `review:${plannedDays.map((d) => d.city).join("-")}`;
+  const start = Date.now();
   try {
     const raw = await generateText(system, prompt);
     const aiNotes = JSON.parse(raw) as ReviewNote[];
     if (Array.isArray(aiNotes)) {
       notes.push(...aiNotes.filter((n) => n && n.type && n.scope && n.message));
     }
-  } catch { /* ignore AI errors */ }
+    logActivity({
+      category: "review",
+      provider: "gemini",
+      cacheKey,
+      input: { daysSummary },
+      output: { noteCount: aiNotes.length },
+      durationMs: Date.now() - start,
+      status: "success",
+    });
+  } catch (err) {
+    logActivity({
+      category: "review",
+      provider: "gemini",
+      cacheKey,
+      input: { daysSummary },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   return notes;
 }

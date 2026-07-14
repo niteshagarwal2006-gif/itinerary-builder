@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { logActivity } from "@/lib/ai/log";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 
@@ -30,38 +31,65 @@ export async function generateImageWithOpenRouter(
   const key = apiKey();
   if (!key) throw new MissingOpenRouterKeyError();
 
-  const res = await fetch(`${OPENROUTER_BASE}/images`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-      "HTTP-Referer": process.env.OPENROUTER_REFERER || "http://localhost:3010",
-      "X-Title": "Itinerary Builder",
-    },
-    body: JSON.stringify({
-      model,
-      prompt,
-      n: 1,
-      size: "1024x1024",
-    }),
-  });
+  const cacheKey = `img:${model}:${prompt}`;
+  const start = Date.now();
 
-  const data = (await res.json()) as OpenRouterImageResponse;
-  if (!res.ok || data.error) {
-    throw new Error(data.error?.message || `OpenRouter image generation failed (${res.status})`);
-  }
+  try {
+    const res = await fetch(`${OPENROUTER_BASE}/images`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+        "HTTP-Referer": process.env.OPENROUTER_REFERER || "http://localhost:3010",
+        "X-Title": "Itinerary Builder",
+      },
+      body: JSON.stringify({
+        model,
+        prompt,
+        n: 1,
+        size: "1024x1024",
+      }),
+    });
 
-  const item = data.data?.[0];
-  if (!item) throw new Error("OpenRouter returned no image data.");
+    const data = (await res.json()) as OpenRouterImageResponse;
+    if (!res.ok || data.error) {
+      throw new Error(data.error?.message || `OpenRouter image generation failed (${res.status})`);
+    }
 
-  if (item.b64_json) {
-    const mime = item.media_type || "image/png";
-    return { url: `data:${mime};base64,${item.b64_json}` };
+    const item = data.data?.[0];
+    if (!item) throw new Error("OpenRouter returned no image data.");
+
+    const result = item.b64_json
+      ? { url: `data:${item.media_type || "image/png"};base64,${item.b64_json}` }
+      : item.url
+      ? { url: item.url }
+      : undefined;
+
+    if (!result) throw new Error("OpenRouter returned neither URL nor base64 image.");
+
+    logActivity({
+      category: "image",
+      provider: "openrouter",
+      cacheKey,
+      input: { prompt, model },
+      output: { source: item.b64_json ? "base64" : "url", length: result.url.length },
+      durationMs: Date.now() - start,
+      status: "success",
+    });
+
+    return result;
+  } catch (err) {
+    logActivity({
+      category: "image",
+      provider: "openrouter",
+      cacheKey,
+      input: { prompt, model },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
   }
-  if (item.url) {
-    return { url: item.url };
-  }
-  throw new Error("OpenRouter returned neither URL nor base64 image.");
 }
 
 export function generateImageId(): string {

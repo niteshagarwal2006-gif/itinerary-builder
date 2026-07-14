@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db.server";
 import { generateText, hasAiProvider } from "@/lib/ai/gemini";
+import { logActivity } from "@/lib/ai/log";
 
 export const runtime = "nodejs";
 
@@ -36,14 +37,34 @@ async function fetchUrlWithAi(city: string, name: string): Promise<string | unde
     "You are a travel data assistant. Given a hotel name and city, return ONLY the official hotel website URL. " +
     "If unsure, return a Google search URL. Return only the URL, no explanation.";
   const prompt = `What is the official website URL for the hotel "${name}" in ${city}, India?`;
+  const cacheKey = `hotel-url:${normalizeCity(city)}:${name.trim().toLowerCase()}`;
+  const start = Date.now();
   try {
     const raw = await generateText(system, prompt);
     const url = raw.trim();
     if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+      logActivity({
+        category: "hotel_url",
+        provider: "gemini",
+        cacheKey,
+        input: { city, name },
+        output: { url },
+        durationMs: Date.now() - start,
+        status: "success",
+      });
       return url;
     }
   } catch (err) {
     console.error("Hotel URL AI fetch failed", err);
+    logActivity({
+      category: "hotel_url",
+      provider: "gemini",
+      cacheKey,
+      input: { city, name },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
   }
   return undefined;
 }

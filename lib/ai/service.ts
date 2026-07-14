@@ -2,6 +2,7 @@ import "server-only";
 import type { Itinerary, Lang } from "../itinerary/types";
 import { collectFields, applyFields, type VerifyIssue } from "./fields";
 import { AI_MODEL, getClient, parseJson, textOf } from "./client";
+import { logActivity } from "./log";
 
 export type { VerifyIssue };
 
@@ -39,15 +40,39 @@ export async function translateItinerary(
     `or merge entries. Return ONLY a JSON object mapping each input id to its ` +
     `translated string — no commentary, no code fences.`;
 
-  const msg = await getClient().messages.create({
-    model: AI_MODEL,
-    max_tokens: 8000,
-    system,
-    messages: [{ role: "user", content: JSON.stringify(payload, null, 2) }],
-  });
+  const cacheKey = `translate:${source}:${target}:${it.preparedFor}`;
+  const start = Date.now();
+  try {
+    const msg = await getClient().messages.create({
+      model: AI_MODEL,
+      max_tokens: 8000,
+      system,
+      messages: [{ role: "user", content: JSON.stringify(payload, null, 2) }],
+    });
 
-  const map = parseJson<Record<string, string>>(textOf(msg));
-  return { ...applyFields(it, map), outputLanguage: target };
+    const map = parseJson<Record<string, string>>(textOf(msg));
+    logActivity({
+      category: "translate",
+      provider: "anthropic",
+      cacheKey,
+      input: { source, target, fieldCount: fields.length },
+      output: { translatedCount: Object.keys(map).length },
+      durationMs: Date.now() - start,
+      status: "success",
+    });
+    return { ...applyFields(it, map), outputLanguage: target };
+  } catch (err) {
+    logActivity({
+      category: "translate",
+      provider: "anthropic",
+      cacheKey,
+      input: { source, target, fieldCount: fields.length },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 /**
@@ -73,25 +98,51 @@ export async function verifyItinerary(it: Itinerary): Promise<VerifyIssue[]> {
     `{"id": <input id>, "severity": "error"|"warning", "message": <what is wrong, in English>, ` +
     `"suggestion": <the corrected full text>}. Omit fields that are correct. No code fences.`;
 
-  const msg = await getClient().messages.create({
-    model: AI_MODEL,
-    max_tokens: 8000,
-    system,
-    messages: [{ role: "user", content: JSON.stringify(payload, null, 2) }],
-  });
+  const cacheKey = `verify:${lang}:${it.preparedFor}`;
+  const start = Date.now();
+  try {
+    const msg = await getClient().messages.create({
+      model: AI_MODEL,
+      max_tokens: 8000,
+      system,
+      messages: [{ role: "user", content: JSON.stringify(payload, null, 2) }],
+    });
 
-  const raw = parseJson<
-    Array<{ id: string; severity?: string; message?: string; suggestion?: string }>
-  >(textOf(msg));
+    const raw = parseJson<
+      Array<{ id: string; severity?: string; message?: string; suggestion?: string }>
+    >(textOf(msg));
 
-  return (Array.isArray(raw) ? raw : [])
-    .filter((r) => r && textById.has(r.id))
-    .map((r) => ({
-      id: r.id,
-      label: labelById.get(r.id) ?? r.id,
-      severity: r.severity === "warning" ? "warning" : "error",
-      message: r.message ?? "Issue detected.",
-      suggestion: r.suggestion ?? "",
-      original: textById.get(r.id) ?? "",
-    }));
+    const issues: VerifyIssue[] = (Array.isArray(raw) ? raw : [])
+      .filter((r) => r && textById.has(r.id))
+      .map((r) => ({
+        id: r.id,
+        label: labelById.get(r.id) ?? r.id,
+        severity: (r.severity === "warning" ? "warning" : "error") as "error" | "warning",
+        message: r.message ?? "Issue detected.",
+        suggestion: r.suggestion ?? "",
+        original: textById.get(r.id) ?? "",
+      }));
+
+    logActivity({
+      category: "verify",
+      provider: "anthropic",
+      cacheKey,
+      input: { lang, fieldCount: fields.length },
+      output: { issueCount: issues.length },
+      durationMs: Date.now() - start,
+      status: "success",
+    });
+    return issues;
+  } catch (err) {
+    logActivity({
+      category: "verify",
+      provider: "anthropic",
+      cacheKey,
+      input: { lang, fieldCount: fields.length },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }

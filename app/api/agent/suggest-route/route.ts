@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateJson } from "@/lib/ai/gemini";
+import { logActivity } from "@/lib/ai/log";
 import type { Lang } from "@/lib/itinerary/types";
 
 export const runtime = "nodejs";
@@ -46,6 +47,8 @@ export async function POST(req: NextRequest) {
     `Suggest 2 to 6 cities total including ${start} and ${end}, in travel order. ` +
     `Return the result as JSON like {"cities":["${start}",...,"${end}"]}. City names only, in ${languageName}.`;
 
+  const cacheKey = `route-suggestion:${start.toLowerCase()}:${end.toLowerCase()}:${nights}:${lang}`;
+  const startTime = Date.now();
   try {
     const data = await generateJson<SuggestRouteOutput>(system, prompt);
     const cities = data.cities
@@ -54,6 +57,15 @@ export async function POST(req: NextRequest) {
       .map((c) => c.replace(/^\d+\.\s*/, ""));
 
     if (!cities || cities.length < 2) {
+      logActivity({
+        category: "route_suggestion",
+        provider: "gemini",
+        cacheKey,
+        input: { start, end, nights, lang },
+        durationMs: Date.now() - startTime,
+        status: "error",
+        errorMessage: "AI returned an invalid route.",
+      });
       return NextResponse.json({ error: "AI returned an invalid route." }, { status: 502 });
     }
 
@@ -61,9 +73,27 @@ export async function POST(req: NextRequest) {
     if (cities[0].toLowerCase() !== start.toLowerCase()) cities.unshift(start);
     if (cities[cities.length - 1].toLowerCase() !== end.toLowerCase()) cities.push(end);
 
+    logActivity({
+      category: "route_suggestion",
+      provider: "gemini",
+      cacheKey,
+      input: { start, end, nights, lang },
+      output: { cities },
+      durationMs: Date.now() - startTime,
+      status: "success",
+    });
     return NextResponse.json({ cities });
   } catch (err) {
     console.error("suggest-route failed", err);
+    logActivity({
+      category: "route_suggestion",
+      provider: "gemini",
+      cacheKey,
+      input: { start, end, nights, lang },
+      durationMs: Date.now() - startTime,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
     const message = err instanceof Error ? err.message : "Failed to suggest route.";
     return NextResponse.json({ error: message }, { status: 503 });
   }

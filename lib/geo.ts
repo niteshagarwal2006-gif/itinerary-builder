@@ -1,5 +1,6 @@
 import "server-only";
 import { getDb } from "@/lib/db.server";
+import { logActivity } from "@/lib/ai/log";
 
 export interface GeoCoord { lat: number; lon: number }
 
@@ -65,9 +66,35 @@ async function fetchNominatim(name: string): Promise<GeoCoord | undefined> {
  */
 export async function geocodeCity(name: string): Promise<GeoCoord | undefined> {
   const cached = getCached(name);
-  if (cached) return cached;
+  if (cached) {
+    logActivity({
+      category: "geocode",
+      provider: "cache",
+      cacheKey: `city:${normName(name)}`,
+      input: { name },
+      output: { lat: cached.lat, lon: cached.lon },
+      savedTo: "city_coords",
+      status: "cached",
+    });
+    return cached;
+  }
+
+  const start = Date.now();
   const coord = await fetchNominatim(name);
   if (coord) setCached(name, coord);
+
+  logActivity({
+    category: "geocode",
+    provider: "nominatim",
+    cacheKey: `city:${normName(name)}`,
+    input: { name, query: `${name}, India` },
+    output: coord ? { lat: coord.lat, lon: coord.lon } : null,
+    savedTo: coord ? "city_coords" : undefined,
+    durationMs: Date.now() - start,
+    status: coord ? "success" : "error",
+    errorMessage: coord ? undefined : "Nominatim returned no coordinates",
+  });
+
   return coord;
 }
 
@@ -107,6 +134,9 @@ export async function calculateDistance(from: string, to: string): Promise<Dista
  * Falls back to straight-line Haversine * 1.25 when OSRM is unavailable.
  */
 export async function calculateDistanceBetween(a: GeoCoord, b: GeoCoord): Promise<DistanceResult | null> {
+  const cacheKey = `dist:${a.lat.toFixed(4)},${a.lon.toFixed(4)}:${b.lat.toFixed(4)},${b.lon.toFixed(4)}`;
+  const start = Date.now();
+
   // Try OSRM car routing first
   try {
     const url =
@@ -116,10 +146,20 @@ export async function calculateDistanceBetween(a: GeoCoord, b: GeoCoord): Promis
       const data = (await res.json()) as { routes?: { distance: number; duration: number }[] };
       const route = data.routes?.[0];
       if (route) {
-        return {
+        const result = {
           km: Math.round(route.distance / 1000),
           hrs: Math.round((route.duration / 3600) * 10) / 10,
         };
+        logActivity({
+          category: "distance",
+          provider: "osrm",
+          cacheKey,
+          input: { from: a, to: b },
+          output: result,
+          durationMs: Date.now() - start,
+          status: "success",
+        });
+        return result;
       }
     }
   } catch {
@@ -128,7 +168,17 @@ export async function calculateDistanceBetween(a: GeoCoord, b: GeoCoord): Promis
 
   const km = Math.round(haversine(a, b) * 1.25);
   const hrs = Math.round((km / 55) * 10) / 10; // ~55 km/h average on Indian highways
-  return { km, hrs };
+  const result = { km, hrs };
+  logActivity({
+    category: "distance",
+    provider: "osrm",
+    cacheKey,
+    input: { from: a, to: b },
+    output: result,
+    durationMs: Date.now() - start,
+    status: "success",
+  });
+  return result;
 }
 
 /**

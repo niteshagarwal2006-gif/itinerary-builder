@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db.server";
 import { generateJson, hasAiProvider } from "@/lib/ai/gemini";
+import { logActivity } from "@/lib/ai/log";
 
 /**
  * Default suggested sights for major Indian cities.
@@ -249,11 +250,35 @@ async function generateWithAi(city: string): Promise<string[]> {
   const system =
     "You are an expert India travel guide. Return ONLY a JSON array of the top 8 must-see sights/activities for the given Indian city. No commentary.";
   const prompt = `List the top 8 must-see sights and activities in ${city}, India as a JSON array of strings.`;
+  const cacheKey = `sight-suggestions:${normalizeCity(city)}`;
+  const start = Date.now();
   try {
     const data = await generateJson<string[]>(system, prompt);
-    if (Array.isArray(data) && data.length > 0) return data.map((s) => String(s).trim()).filter(Boolean);
+    if (Array.isArray(data) && data.length > 0) {
+      const sights = data.map((s) => String(s).trim()).filter(Boolean);
+      logActivity({
+        category: "sight_suggestions",
+        provider: "gemini",
+        cacheKey,
+        input: { city },
+        output: { count: sights.length, sights },
+        savedTo: "sights",
+        durationMs: Date.now() - start,
+        status: "success",
+      });
+      return sights;
+    }
   } catch (err) {
     console.error("AI sight generation failed for", city, err);
+    logActivity({
+      category: "sight_suggestions",
+      provider: "gemini",
+      cacheKey,
+      input: { city },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
   }
   return [];
 }

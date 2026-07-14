@@ -3,6 +3,7 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import type { ImageRef } from "@/lib/itinerary/types";
 import { geocodeCities, type GeoCoord } from "@/lib/geo";
+import { logActivity } from "@/lib/ai/log";
 import { findGeneratedImage, saveGeneratedImage, toImageRef } from "./db";
 
 // staticmaps is a CommonJS package; import lazily so it only loads when needed.
@@ -94,9 +95,21 @@ export async function getRealRouteMapImage(
   const cached = findGeneratedImage("route", key);
   if (cached) {
     const ref = toImageRef(cached);
-    if (ref.url) return ref;
+    if (ref.url) {
+      logActivity({
+        category: "image",
+        provider: "cache",
+        cacheKey: `route-map:${key}`,
+        input: { cities },
+        output: { url: ref.url, caption: ref.caption },
+        savedTo: cached.localPath ?? "generated_images",
+        status: "cached",
+      });
+      return ref;
+    }
   }
 
+  const start = Date.now();
   let geocoded: GeocodedCity[] = [];
   if (precomputedCoords && precomputedCoords.size >= cities.length) {
     geocoded = cities
@@ -106,10 +119,32 @@ export async function getRealRouteMapImage(
     geocoded = await geocodeCities(cities);
   }
 
-  if (geocoded.length < 2) return undefined;
+  if (geocoded.length < 2) {
+    logActivity({
+      category: "image",
+      provider: "nominatim",
+      cacheKey: `route-map:${key}`,
+      input: { cities },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: "Could not geocode enough cities",
+    });
+    return undefined;
+  }
 
   const buffer = await renderStaticMapsRoute(geocoded);
-  if (!buffer) return undefined;
+  if (!buffer) {
+    logActivity({
+      category: "image",
+      provider: "web",
+      cacheKey: `route-map:${key}`,
+      input: { cities, geocoded: geocoded.map((g) => g.name) },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: "staticmaps render failed",
+    });
+    return undefined;
+  }
 
   const rel = path.join("uploads", "generated", "route", `${key}.png`);
   const abs = path.join(process.cwd(), "public", rel);
@@ -118,5 +153,15 @@ export async function getRealRouteMapImage(
 
   const route = cities.map(titleCase).join(" → ");
   saveGeneratedImage("route", key, "web", `/${rel}`, rel, { caption: route });
+  logActivity({
+    category: "image",
+    provider: "web",
+    cacheKey: `route-map:${key}`,
+    input: { cities, geocoded: geocoded.map((g) => g.name) },
+    output: { localPath: rel, caption: route, bytes: buffer.length },
+    savedTo: rel,
+    durationMs: Date.now() - start,
+    status: "success",
+  });
   return { url: `/${rel}`, caption: route };
 }

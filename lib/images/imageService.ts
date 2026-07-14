@@ -2,6 +2,7 @@ import "server-only";
 import { writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import type { ImageRef } from "@/lib/itinerary/types";
+import { logActivity } from "@/lib/ai/log";
 import { fetchWikipediaImage } from "./web";
 import { generateImageWithOpenRouter } from "./openrouter";
 import { findGeneratedImage, saveGeneratedImage, toImageRef } from "./db";
@@ -65,17 +66,39 @@ export async function getImage(opts: GetImageOptions): Promise<ImageRef | undefi
   const cached = findGeneratedImage(type, key);
   if (cached) {
     const ref = toImageRef(cached);
-    if (ref.url) return ref;
+    if (ref.url) {
+      logActivity({
+        category: "image",
+        provider: "cache",
+        cacheKey: `${type}:${key}`,
+        input: { type, key, prompt },
+        output: { url: ref.url, caption: ref.caption },
+        savedTo: cached.localPath ?? "generated_images",
+        status: "cached",
+      });
+      return ref;
+    }
   }
 
   // 2. Web fetch (only for city/sight, not route/watercolor)
   if (!skipWeb && (type === "city" || type === "sight")) {
+    const webStart = Date.now();
     try {
       const webUrl = await fetchWikipediaImage(key);
       if (webUrl) {
         const buffer = await downloadImage(webUrl);
         const localPath = await saveLocalImage(type, key, buffer);
         saveGeneratedImage(type, key, "web", webUrl, localPath, { caption });
+        logActivity({
+          category: "image",
+          provider: "web",
+          cacheKey: `${type}:${key}`,
+          input: { type, key, prompt },
+          output: { source: "wikipedia", url: webUrl },
+          savedTo: localPath,
+          durationMs: Date.now() - webStart,
+          status: "success",
+        });
         return { url: `/${localPath}`, caption };
       }
     } catch {
@@ -181,16 +204,49 @@ export async function getSightImage(title: string, cityName?: string): Promise<I
 /** Download a user-selected external image (e.g. Pexels) and cache it as a sight image. */
 export async function saveSightImageFromUrl(url: string, title: string, cityName?: string): Promise<ImageRef | undefined> {
   const key = cityName ? `${cityName}:${title}` : title;
+  const cacheKey = `sight:${key}`;
+  const start = Date.now();
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-    if (!res.ok) return undefined;
+    if (!res.ok) {
+      logActivity({
+        category: "image",
+        provider: "web",
+        cacheKey,
+        input: { url, title, cityName },
+        durationMs: Date.now() - start,
+        status: "error",
+        errorMessage: `HTTP ${res.status}`,
+      });
+      return undefined;
+    }
     const arrayBuffer = await res.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const ext = url.split("?")[0]?.split(".").pop()?.toLowerCase() === "png" ? "png" : "jpg";
     const localPath = await saveLocalImage("sight", key, buffer, ext);
     saveGeneratedImage("sight", key, "web", url, localPath, { caption: title });
-    return { url: `/${localPath}`, caption: title };
-  } catch {
+    const ref = { url: `/${localPath}`, caption: title };
+    logActivity({
+      category: "image",
+      provider: "web",
+      cacheKey,
+      input: { url, title, cityName },
+      output: { localPath, caption: title },
+      savedTo: localPath,
+      durationMs: Date.now() - start,
+      status: "success",
+    });
+    return ref;
+  } catch (err) {
+    logActivity({
+      category: "image",
+      provider: "web",
+      cacheKey,
+      input: { url, title, cityName },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
     return undefined;
   }
 }
