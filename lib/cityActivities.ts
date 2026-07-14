@@ -168,8 +168,8 @@ function languageName(lang: Lang): string {
 
 async function generateActivityDescription(title: string, city: string, lang: Lang): Promise<string> {
   if (!hasAiProvider()) return "";
-  const system = "You are a luxury travel writer for the Indian subcontinent. Write concise, evocative descriptions.";
-  const prompt = `Write a 2-3 sentence description in ${languageName(lang)} for the activity "${title}" in ${city}, India, suitable for a high-end travel itinerary. Return only the description, no labels.`;
+  const system = "You are a luxury travel writer for the Indian subcontinent. Write rich, evocative descriptions.";
+  const prompt = `Write a detailed paragraph of 4-6 sentences in ${languageName(lang)} for the activity "${title}" in ${city}, India, suitable for a high-end travel itinerary. Describe the experience, atmosphere, and what makes it memorable. Return only the description, no labels.`;
   const cacheKey = `activity-desc:${lang}:${city}:${title}`;
   const start = Date.now();
   try {

@@ -147,7 +147,7 @@ function leftRightImageText(
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: caption ? 40 : 0 },
-      children: [imageRun(img, 40)],
+      children: [imageRun(img, 30)],
     }),
   ];
   if (caption) {
@@ -162,15 +162,16 @@ function leftRightImageText(
   }
 
   const imageCell = new TableCell({
-    width: { size: 15, type: WidthType.PERCENTAGE },
-    margins: { top: 60, bottom: 60, right: 80 },
+    width: { size: 12, type: WidthType.PERCENTAGE },
+    margins: { top: 60, bottom: 60, right: 60 },
     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+    verticalAlign: "center",
     children: imageCellContent,
   });
 
   const textCell = new TableCell({
-    width: { size: 85, type: WidthType.PERCENTAGE },
-    margins: { top: 60, bottom: 60, left: 80 },
+    width: { size: 88, type: WidthType.PERCENTAGE },
+    margins: { top: 60, bottom: 60, left: 60 },
     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
     verticalAlign: "center",
     children: textBlocks.length ? textBlocks : [new Paragraph({ children: [] })],
@@ -446,7 +447,7 @@ function buildDay(day: DayBlock, imgs: Map<ImageRef, ResolvedImage>, S: DocStrin
     if (introParas.length) {
       out.push(leftRightImageText(imgs.get(day.cityImage)!, introParas, day.cityImage.caption));
     } else {
-      out.push(...centeredImageParagraph(imgs.get(day.cityImage)!, 90, day.cityImage.caption));
+      out.push(...centeredImageParagraph(imgs.get(day.cityImage)!, 50, day.cityImage.caption));
     }
   } else if (day.intro) {
     out.push(bodyPara(day.intro));
@@ -570,7 +571,7 @@ function buildSight(s: Sight, imgs: Map<ImageRef, ResolvedImage>): (Paragraph | 
     if (descParas.length) {
       return [titlePara, leftRightImageText(imgs.get(s.image)!, descParas, s.image.caption)];
     }
-    return [titlePara, ...centeredImageParagraph(imgs.get(s.image)!, 45, s.image.caption)];
+    return [titlePara, ...centeredImageParagraph(imgs.get(s.image)!, 35, s.image.caption)];
   }
 
   return [titlePara, ...descParas];

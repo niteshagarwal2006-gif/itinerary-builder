@@ -352,8 +352,8 @@ export function saveSightDescription(title: string, city: string, lang: Lang, de
 
 async function generateVisitDescription(title: string, city: string, lang: Lang): Promise<string> {
   if (!hasAiProvider()) return "";
-  const system = "You are a luxury travel writer for the Indian subcontinent. Write concise, evocative descriptions.";
-  const prompt = `Write a 2-3 sentence description in ${languageName(lang)} for "${title}" in ${city}, India, suitable for a high-end travel itinerary. Return only the description, no labels.`;
+  const system = "You are a luxury travel writer for the Indian subcontinent. Write rich, evocative descriptions.";
+  const prompt = `Write a detailed paragraph of 4-6 sentences in ${languageName(lang)} for "${title}" in ${city}, India, suitable for a high-end travel itinerary. Describe the atmosphere, highlights, and why it is special. Return only the description, no labels.`;
   const cacheKey = `desc:${lang}:${city}:${title}`;
   const start = Date.now();
   try {

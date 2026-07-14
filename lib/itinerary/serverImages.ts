@@ -75,7 +75,8 @@ export function createServerImageResolver(): ImageResolver {
       if (ref.uploadId) {
         cache.set(key, fromUpload(ref.uploadId));
       } else if (ref.url) {
-        cache.set(key, fromUrl(ref.url));
+        // Local public-relative paths should be read from disk, not fetched.
+        cache.set(key, ref.url.startsWith("/") ? fromPublicPath(ref.url) : fromUrl(ref.url));
       } else if (src) {
         cache.set(key, fromPublicPath(src));
       }
