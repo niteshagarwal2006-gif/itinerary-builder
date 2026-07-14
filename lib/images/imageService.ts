@@ -1,6 +1,7 @@
 import "server-only";
 import { writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
+import sharp from "sharp";
 import type { ImageRef } from "@/lib/itinerary/types";
 import { logActivity } from "@/lib/ai/log";
 import { fetchWikipediaImage } from "./web";
@@ -36,14 +37,25 @@ function ensureDir(p: string): void {
   mkdirSync(path.dirname(p), { recursive: true });
 }
 
-async function downloadImage(url: string): Promise<Buffer> {
+async function resizeBuffer(buffer: Buffer, maxWidth = 1200, quality = 85): Promise<Buffer> {
+  try {
+    return await sharp(buffer)
+      .resize({ width: maxWidth, withoutEnlargement: true, fit: "inside" })
+      .jpeg({ quality, progressive: true, mozjpeg: true })
+      .toBuffer();
+  } catch {
+    return buffer;
+  }
+}
+
+async function downloadImage(url: string, maxWidth = 1200): Promise<Buffer> {
   if (typeof url !== "string") {
     throw new TypeError(`downloadImage expected a string URL, received ${typeof url}`);
   }
   const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!res.ok) throw new Error(`Failed to download image: ${res.status}`);
-  const arrayBuffer = await res.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  return maxWidth > 0 ? resizeBuffer(buffer, maxWidth) : buffer;
 }
 
 async function saveLocalImage(type: ImageType, key: string, buffer: Buffer, ext = "png"): Promise<string> {
@@ -126,16 +138,16 @@ export async function getImage(opts: GetImageOptions): Promise<ImageRef | undefi
     let finalUrl = url;
 
     if (url.startsWith("data:")) {
-      // base64 — decode and save locally
+      // base64 — decode, resize and save locally as JPEG
       const base64 = url.split(",")[1];
-      const buffer = Buffer.from(base64, "base64");
-      localPath = await saveLocalImage(type, key, buffer);
+      const buffer = await resizeBuffer(Buffer.from(base64, "base64"), 1200);
+      localPath = await saveLocalImage(type, key, buffer, "jpg");
       finalUrl = `/${localPath}`;
     } else {
       // remote URL — download and save locally so the docx generator can read it
       try {
         const buffer = await downloadImage(url);
-        localPath = await saveLocalImage(type, key, buffer);
+        localPath = await saveLocalImage(type, key, buffer, "jpg");
         finalUrl = `/${localPath}`;
       } catch {
         // keep remote URL as fallback
@@ -153,13 +165,13 @@ export async function getImage(opts: GetImageOptions): Promise<ImageRef | undefi
         let localPath: string | null = null;
         let finalUrl = url;
         if (base64) {
-          const buffer = Buffer.from(base64, "base64");
-          localPath = await saveLocalImage(type, key, buffer);
+          const buffer = await resizeBuffer(Buffer.from(base64, "base64"), 1200);
+          localPath = await saveLocalImage(type, key, buffer, "jpg");
           finalUrl = `/${localPath}`;
         } else {
           try {
             const buffer = await downloadImage(url);
-            localPath = await saveLocalImage(type, key, buffer);
+            localPath = await saveLocalImage(type, key, buffer, "jpg");
             finalUrl = `/${localPath}`;
           } catch { /* keep remote */ }
         }
@@ -237,9 +249,8 @@ export async function saveSightImageFromUrl(url: string, title: string, cityName
       });
       return undefined;
     }
-    const arrayBuffer = await res.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const ext = url.split("?")[0]?.split(".").pop()?.toLowerCase() === "png" ? "png" : "jpg";
+    const buffer = await resizeBuffer(Buffer.from(await res.arrayBuffer()), 1200);
+    const ext = "jpg";
     const localPath = await saveLocalImage("sight", key, buffer, ext);
     saveGeneratedImage("sight", key, "web", url, localPath, { caption: title });
     const ref = { url: `/${localPath}`, caption: title };

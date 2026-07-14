@@ -5,6 +5,8 @@ export const runtime = "nodejs";
 interface PexelsPhoto {
   id: number;
   src: {
+    tiny: string;
+    small: string;
     medium: string;
     large: string;
     original: string;
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest) {
   try {
     const url =
       `https://api.pexels.com/v1/search?` +
-      new URLSearchParams({ query, per_page: "8", orientation: "landscape" }).toString();
+      new URLSearchParams({ query, per_page: "6", orientation: "landscape" }).toString();
 
     const res = await fetch(url, {
       headers: { Authorization: key },
@@ -48,9 +50,9 @@ export async function GET(req: NextRequest) {
     const data = (await res.json()) as { photos?: PexelsPhoto[] };
     const photos = (data.photos || []).map((p) => ({
       id: p.id,
-      thumb: p.src.medium,
-      url: p.src.large || p.src.medium,
-      full: p.src.original,
+      thumb: p.src.tiny || p.src.small || p.src.medium,
+      url: p.src.small || p.src.medium,
+      full: p.src.large || p.src.original,
       photographer: p.photographer,
       photographerUrl: p.photographer_url,
       alt: p.alt,
