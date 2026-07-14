@@ -59,6 +59,8 @@ export interface Hotel {
   label?: string;
 }
 
+export type TimeOfDay = "morning" | "afternoon" | "evening";
+
 export interface Sight {
   /** Stable identity for React keys and reordering (backfilled if missing). */
   id?: string;
@@ -70,6 +72,8 @@ export interface Sight {
   enRoute?: boolean;
   /** Optional closure note shown after the description, e.g. "Closed on Fridays". */
   closureNote?: string;
+  /** Time slot for the visit: morning, afternoon or evening. */
+  timeOfDay?: TimeOfDay;
 }
 
 export interface Activity {
@@ -126,6 +130,12 @@ export interface TripSummary {
   mealPlan?: string;
 }
 
+export interface MealFlags {
+  b: boolean;
+  l: boolean;
+  d: boolean;
+}
+
 export interface Itinerary {
   /** Output language of the generated document. Defaults to French. */
   outputLanguage?: Lang;
@@ -144,6 +154,8 @@ export interface Itinerary {
   highlights: string[];
   /** Watercolor collage image shown at the top of the highlights page. */
   highlightsImage?: ImageRef;
+  /** Meal plan flags used to humanize day intros and closings. */
+  mealPlan?: MealFlags;
   days: DayBlock[];
 }
 

@@ -10,7 +10,7 @@ export function uid(): string {
 
 /** A fresh, empty sightseeing entry. */
 export function emptySight(): Sight {
-  return { id: uid(), title: "", description: "" };
+  return { id: uid(), title: "", description: "", timeOfDay: "morning" };
 }
 
 /** A fresh, empty day block. */

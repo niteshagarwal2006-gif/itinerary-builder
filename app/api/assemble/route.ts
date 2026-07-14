@@ -553,12 +553,15 @@ async function buildDayBlock(
           : `Closed on ${check.dayName}s. ${check.note ?? ""}`;
       }
     }
+    const slotIndex = day.visits.indexOf(visit) % 3;
+    const timeOfDay: import("@/lib/itinerary/types").TimeOfDay = slotIndex === 0 ? "morning" : slotIndex === 1 ? "afternoon" : "evening";
     sights.push({
       id: randomUUID(),
       title: visit.toUpperCase(),
       description: desc,
       image,
       closureNote,
+      timeOfDay,
     });
   }
 
@@ -746,6 +749,7 @@ export async function POST(req: NextRequest) {
     highlights,
     highlightsImage: highlightsImage ?? undefined,
     routeMap: routeMap ?? undefined,
+    mealPlan,
     days: dayBlocks,
   };
 

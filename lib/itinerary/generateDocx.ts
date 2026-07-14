@@ -147,7 +147,7 @@ function leftRightImageText(
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: caption ? 40 : 0 },
-      children: [imageRun(img, 220)],
+      children: [imageRun(img, 55)],
     }),
   ];
   if (caption) {
@@ -162,14 +162,14 @@ function leftRightImageText(
   }
 
   const imageCell = new TableCell({
-    width: { size: 35, type: WidthType.PERCENTAGE },
-    margins: { top: 60, bottom: 60, right: 120 },
+    width: { size: 20, type: WidthType.PERCENTAGE },
+    margins: { top: 60, bottom: 60, right: 80 },
     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
     children: imageCellContent,
   });
 
   const textCell = new TableCell({
-    width: { size: 65, type: WidthType.PERCENTAGE },
+    width: { size: 80, type: WidthType.PERCENTAGE },
     margins: { top: 60, bottom: 60, left: 80 },
     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
     verticalAlign: "center",
@@ -206,6 +206,12 @@ function link(text: string, url: string): ExternalHyperlink {
       new TextRun({ text, style: "Hyperlink", font: FONTS.body, size: 21, color: COLORS.gold, underline: {} }),
     ],
   });
+}
+
+/** Capitalise the first letter of a string, leaving the rest unchanged. */
+function capFirst(text: string): string {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function sectionHeading(text: string): Paragraph {
@@ -361,7 +367,7 @@ function dayBanner(day: DayBlock): Table {
   }
 
   const c3: Paragraph[] = [];
-  const hotelLine = [day.hotel?.name, day.hotel?.category].filter(Boolean).join(" · ");
+  const hotelLine = [day.hotel?.name ? capFirst(day.hotel.name) : undefined, day.hotel?.category].filter(Boolean).join(" · ");
   c3.push(cellText([new TextRun({ text: (hotelLine || day.city).toUpperCase(), bold: true, color: COLORS.white, font: FONTS.body, size: 18 })]));
 
   const mkCell = (children: Paragraph[], width: number) =>
@@ -405,10 +411,11 @@ function buildDay(day: DayBlock, imgs: Map<ImageRef, ResolvedImage>, S: DocStrin
     const runs: (TextRun | ExternalHyperlink)[] = [
       new TextRun({ text: `${label} – `, bold: true, font: FONTS.body, size: 21, color: COLORS.deep }),
     ];
+    const displayName = capFirst(day.hotel.name);
     runs.push(
       day.hotel.url
-        ? link(day.hotel.name, day.hotel.url)
-        : new TextRun({ text: day.hotel.name, bold: true, font: FONTS.body, size: 21, color: COLORS.deep })
+        ? link(displayName, day.hotel.url)
+        : new TextRun({ text: displayName, bold: true, font: FONTS.body, size: 21, color: COLORS.deep })
     );
     if (day.hotel.category) {
       runs.push(new TextRun({ text: `  (${day.hotel.category})`, font: FONTS.body, size: 19, color: COLORS.ink }));
@@ -439,7 +446,7 @@ function buildDay(day: DayBlock, imgs: Map<ImageRef, ResolvedImage>, S: DocStrin
     if (introParas.length) {
       out.push(leftRightImageText(imgs.get(day.cityImage)!, introParas, day.cityImage.caption));
     } else {
-      out.push(...centeredImageParagraph(imgs.get(day.cityImage)!, 360, day.cityImage.caption));
+      out.push(...centeredImageParagraph(imgs.get(day.cityImage)!, 90, day.cityImage.caption));
     }
   } else if (day.intro) {
     out.push(bodyPara(day.intro));
@@ -465,7 +472,30 @@ function buildDay(day: DayBlock, imgs: Map<ImageRef, ResolvedImage>, S: DocStrin
     }
   }
 
-  for (const s of day.sights) out.push(...buildSight(s, imgs));
+  // Sights grouped by time of day
+  const sightsByTime: Record<import("./types").TimeOfDay, Sight[]> = {
+    morning: day.sights.filter((s) => s.timeOfDay === "morning" || !s.timeOfDay),
+    afternoon: day.sights.filter((s) => s.timeOfDay === "afternoon"),
+    evening: day.sights.filter((s) => s.timeOfDay === "evening"),
+  };
+  const timeLabels: Record<import("./types").TimeOfDay, string> = {
+    morning: "MORNING",
+    afternoon: "AFTERNOON",
+    evening: "EVENING",
+  };
+  for (const slot of (["morning", "afternoon", "evening"] as import("./types").TimeOfDay[])) {
+    const list = sightsByTime[slot];
+    if (list.length === 0) continue;
+    out.push(
+      new Paragraph({
+        spacing: { before: 140, after: 60 },
+        children: [
+          new TextRun({ text: timeLabels[slot], bold: true, font: FONTS.heading, size: 20, color: COLORS.gold }),
+        ],
+      })
+    );
+    for (const s of list) out.push(...buildSight(s, imgs));
+  }
 
   if (day.activities && day.activities.length > 0) {
     out.push(
@@ -540,7 +570,7 @@ function buildSight(s: Sight, imgs: Map<ImageRef, ResolvedImage>): (Paragraph | 
     if (descParas.length) {
       return [titlePara, leftRightImageText(imgs.get(s.image)!, descParas, s.image.caption)];
     }
-    return [titlePara, ...centeredImageParagraph(imgs.get(s.image)!, 280, s.image.caption)];
+    return [titlePara, ...centeredImageParagraph(imgs.get(s.image)!, 70, s.image.caption)];
   }
 
   return [titlePara, ...descParas];

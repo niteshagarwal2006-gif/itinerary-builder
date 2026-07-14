@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { Itinerary } from "@/lib/itinerary/types";
 import { emptyItinerary, ensureItineraryIds } from "@/lib/itinerary/factory";
-import { Toolbar } from "@/components/Toolbar";
+import { Toolbar, type VerifyNote } from "@/components/Toolbar";
 import { LanguageBar } from "@/components/LanguageBar";
 import { PreviewPane } from "@/components/PreviewPane";
 import { CoverSection } from "@/components/sections/CoverSection";
@@ -13,6 +13,7 @@ import { DaysSection } from "@/components/sections/DaysSection";
 
 export default function Home() {
   const [itinerary, setItinerary] = useState<Itinerary>(emptyItinerary);
+  const [verifyNotes, setVerifyNotes] = useState<VerifyNote[] | null>(null);
 
   const patch = useCallback((partial: Partial<Itinerary>) => {
     setItinerary((prev) => ({ ...prev, ...partial }));
@@ -20,6 +21,10 @@ export default function Home() {
 
   const loadItinerary = useCallback((it: Itinerary) => {
     setItinerary(ensureItineraryIds(it));
+  }, []);
+
+  const handleVerify = useCallback((notes: VerifyNote[]) => {
+    setVerifyNotes(notes);
   }, []);
 
   // When redirected from the wizard, auto-load the assembled itinerary.
@@ -80,9 +85,37 @@ export default function Home() {
               Answer the questions · export a Word document
             </span>
           </div>
-          <Toolbar itinerary={itinerary} onLoad={loadItinerary} />
+          <Toolbar itinerary={itinerary} onLoad={loadItinerary} onVerify={handleVerify} />
         </div>
       </header>
+
+      {/* Verify notes */}
+      {verifyNotes && verifyNotes.length > 0 && (
+        <div className="mx-auto max-w-[1600px] px-5 pt-4">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-bold uppercase tracking-wide text-amber-700">AI Verification</p>
+              <button
+                type="button"
+                onClick={() => setVerifyNotes(null)}
+                className="text-xs text-amber-700 hover:text-amber-900"
+              >
+                Dismiss
+              </button>
+            </div>
+            <ul className="space-y-1.5">
+              {verifyNotes.map((n, i) => (
+                <li key={i} className="flex gap-2 text-sm">
+                  <span className={`shrink-0 font-semibold ${n.type === "warning" ? "text-red-600" : n.type === "ok" ? "text-emerald-600" : "text-amber-700"}`}>
+                    {n.type === "warning" ? "⚠" : n.type === "ok" ? "✓" : "ℹ"} {n.scope}
+                  </span>
+                  <span className="text-amber-900">{n.message}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* Two-pane editor */}
       <main className="mx-auto grid w-full max-w-[1600px] flex-1 grid-cols-1 gap-6 px-5 py-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

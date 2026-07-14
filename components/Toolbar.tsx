@@ -75,15 +75,25 @@ function downloadBlob(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+export interface VerifyNote {
+  type: "warning" | "info" | "ok";
+  scope: string;
+  message: string;
+}
+
 export function Toolbar({
   itinerary,
   onLoad,
+  onVerify,
 }: {
   itinerary: Itinerary;
   onLoad: (it: Itinerary) => void;
+  onVerify?: (notes: VerifyNote[]) => void;
 }) {
   const [saved, setSaved] = useState<SavedEntry[]>([]);
   const [busy, setBusy] = useState(false);
+  const [humanizing, setHumanizing] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState("");
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -130,6 +140,73 @@ export function Toolbar({
       setError("Could not reach the server to generate the document.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleHumanize(): Promise<void> {
+    setHumanizing(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/humanize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itinerary }),
+      });
+      if (!res.ok) {
+        let message = `Humanize failed (${res.status}).`;
+        try {
+          const data = (await res.json()) as { error?: string };
+          if (data?.error) message = data.error;
+        } catch {
+          /* response had no JSON body */
+        }
+        setError(message);
+        return;
+      }
+      const data = (await res.json()) as { itinerary?: Itinerary };
+      if (data.itinerary) {
+        onLoad(data.itinerary);
+      } else {
+        setError("Humanize returned no itinerary.");
+      }
+    } catch {
+      setError("Could not reach the server to humanize the itinerary.");
+    } finally {
+      setHumanizing(false);
+    }
+  }
+
+  async function handleVerify(): Promise<void> {
+    setVerifying(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itinerary }),
+      });
+      if (!res.ok) {
+        let message = `Verify failed (${res.status}).`;
+        try {
+          const data = (await res.json()) as { error?: string };
+          if (data?.error) message = data.error;
+        } catch {
+          /* response had no JSON body */
+        }
+        setError(message);
+        return;
+      }
+      const data = (await res.json()) as { notes?: VerifyNote[] };
+      if (onVerify && data.notes) {
+        onVerify(data.notes);
+      } else if (data.notes) {
+        const text = data.notes.map((n) => `[${n.type.toUpperCase()}] ${n.scope}: ${n.message}`).join("\n");
+        window.alert(text || "No issues found.");
+      }
+    } catch {
+      setError("Could not reach the server to verify the itinerary.");
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -237,14 +314,32 @@ export function Toolbar({
         <Button
           variant="primary"
           onClick={() => void handleGenerate()}
-          disabled={busy}
+          disabled={busy || humanizing || verifying}
         >
           {busy ? "Generating…" : "Generate Word"}
         </Button>
 
+        <Button
+          variant="secondary"
+          onClick={() => void handleHumanize()}
+          disabled={busy || humanizing || verifying}
+          title="Rewrite intros and closings with warm, human direction and meal cues"
+        >
+          {humanizing ? "Humanizing…" : "📝 Humanize"}
+        </Button>
+
+        <Button
+          variant="secondary"
+          onClick={() => void handleVerify()}
+          disabled={busy || humanizing || verifying}
+          title="AI check for logistics, festivals, closures and flow"
+        >
+          {verifying ? "Verifying…" : "✅ Verify"}
+        </Button>
+
         <span className="mx-1 h-6 w-px bg-line" aria-hidden />
 
-        <Button onClick={handleSave} disabled={busy}>
+        <Button onClick={handleSave} disabled={busy || humanizing || verifying}>
           Save
         </Button>
 
@@ -252,7 +347,7 @@ export function Toolbar({
           <select
             value={selectedId}
             onChange={(e) => handleSelect(e.target.value)}
-            disabled={busy || saved.length === 0}
+            disabled={busy || humanizing || saved.length === 0}
             aria-label="Load a saved itinerary"
             className={cn(
               "rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink shadow-sm outline-none transition focus:border-deep focus:ring-2 focus:ring-deep/15 disabled:cursor-not-allowed disabled:opacity-50"
@@ -270,7 +365,7 @@ export function Toolbar({
           <Button
             variant="danger"
             onClick={handleDelete}
-            disabled={busy || !selectedId}
+            disabled={busy || humanizing || !selectedId}
             title="Delete the selected saved itinerary"
           >
             Delete
@@ -279,12 +374,12 @@ export function Toolbar({
 
         <span className="mx-1 h-6 w-px bg-line" aria-hidden />
 
-        <Button onClick={handleExportJson} disabled={busy}>
+        <Button onClick={handleExportJson} disabled={busy || humanizing || verifying}>
           Export JSON
         </Button>
         <Button
           onClick={() => importInputRef.current?.click()}
-          disabled={busy}
+          disabled={busy || humanizing || verifying}
         >
           Import JSON
         </Button>
@@ -302,10 +397,10 @@ export function Toolbar({
 
         <span className="mx-1 h-6 w-px bg-line" aria-hidden />
 
-        <Button onClick={() => onLoad(sampleItinerary)} disabled={busy}>
+        <Button onClick={() => onLoad(sampleItinerary)} disabled={busy || humanizing || verifying}>
           Load sample
         </Button>
-        <Button variant="ghost" onClick={handleNew} disabled={busy}>
+        <Button variant="ghost" onClick={handleNew} disabled={busy || humanizing || verifying}>
           New
         </Button>
       </div>

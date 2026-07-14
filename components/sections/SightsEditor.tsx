@@ -6,8 +6,14 @@ import { ImageField } from "@/components/ImageField";
 import { LibraryPicker } from "@/components/LibraryPicker";
 import { emptySight, uid } from "@/lib/itinerary/factory";
 import { saveToLibrary } from "@/lib/libraryClient";
-import type { Sight, Lang } from "@/lib/itinerary/types";
+import type { Sight, Lang, TimeOfDay } from "@/lib/itinerary/types";
 import type { LibSight } from "@/lib/library-types";
+
+const TIME_SLOTS: { value: TimeOfDay; label: string }[] = [
+  { value: "morning", label: "Morning" },
+  { value: "afternoon", label: "Afternoon" },
+  { value: "evening", label: "Evening" },
+];
 
 /**
  * Editor for a day's list of sightseeing entries. Each sight is a small card
@@ -85,6 +91,24 @@ export function SightsEditor({
                   onChange={(v) => setAt(i, { title: v })}
                   placeholder="Sight title, e.g. BASILIQUE SAN THOMÉ – …"
                 />
+              </Field>
+              <Field label="Time of day" className="mt-2">
+                <div className="flex gap-2">
+                  {TIME_SLOTS.map((slot) => (
+                    <button
+                      key={slot.value}
+                      type="button"
+                      onClick={() => setAt(i, { timeOfDay: slot.value })}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        (sight.timeOfDay || "morning") === slot.value
+                          ? "border-deep bg-deep text-white"
+                          : "border-line bg-white text-ink hover:bg-cream"
+                      }`}
+                    >
+                      {slot.label}
+                    </button>
+                  ))}
+                </div>
               </Field>
               {saved && saved.id === sight.id && (
                 <span className="mt-1 block text-xs font-medium text-emerald-700">
