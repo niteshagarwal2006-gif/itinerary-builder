@@ -1018,12 +1018,32 @@ export default function WizardPage() {
   const [error, setError] = useState("");
   const [review, setReview] = useState<ReviewNote[] | null>(null);
   const [itinerary, setItinerary] = useState<object | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const estimatedTotal = 60; // seconds, used for the progress estimate
 
   const totalSteps = 7;
+
+  useEffect(() => {
+    if (!assembling) return;
+    const start = Date.now();
+    const interval = setInterval(() => {
+      const seconds = (Date.now() - start) / 1000;
+      setElapsed(seconds);
+      // Ease-out progress: approach 90% over estimatedTotal, then crawl.
+      const pct = seconds < estimatedTotal
+        ? 90 * (1 - Math.exp(-3 * (seconds / estimatedTotal)))
+        : 90 + 9 * (1 - Math.exp(-(seconds - estimatedTotal) / 30));
+      setProgress(Math.min(pct, 99));
+    }, 500);
+    return () => clearInterval(interval);
+  }, [assembling]);
 
   async function assemble() {
     setAssembling(true);
     setError("");
+    setProgress(0);
+    setElapsed(0);
     try {
       const payload = {
         client: state.client,
@@ -1052,6 +1072,7 @@ export default function WizardPage() {
       }
       setItinerary(data.itinerary);
       setReview(data.review ?? []);
+      setProgress(100);
       setAssembling(false);
       setStep(6);
     } catch {
@@ -1084,7 +1105,24 @@ export default function WizardPage() {
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-line border-t-deep mx-auto" />
           <p className="mt-4 font-semibold text-deep">Building your itinerary…</p>
           <p className="text-sm text-ink/50">AI is writing descriptions, transitions and finding images.</p>
-          <p className="mt-2 text-xs text-ink/40">First run can take 30–60 seconds while images are generated; subsequent runs reuse them.</p>
+
+          <div className="mt-6">
+            <div className="flex justify-between text-xs text-ink/60 mb-1">
+              <span>{Math.round(progress)}%</span>
+              <span>{elapsed > estimatedTotal ? "Finalizing…" : `~${Math.max(1, Math.round(estimatedTotal - elapsed))}s remaining`}</span>
+            </div>
+            <div className="h-3 w-full overflow-hidden rounded-full bg-line">
+              <div
+                className="h-full rounded-full bg-deep transition-all duration-500 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            {elapsed > estimatedTotal && (
+              <p className="mt-2 text-xs text-amber-600">Taking longer than usual — still working…</p>
+            )}
+          </div>
+
+          <p className="mt-4 text-xs text-ink/40">First run can take 30–60 seconds while images are generated; subsequent runs reuse them.</p>
         </div>
       </div>
     );
