@@ -315,7 +315,8 @@ async function buildDayBlock(
   const sights: Sight[] = [];
   for (const visit of day.visits) {
     const desc = await ensureSightDescription(visit, city, lang);
-    const selectedUrl = input.sightImages?.[visit.toLowerCase().trim()];
+    const sightKey = `${city}:${visit}`.toLowerCase().trim();
+    const selectedUrl = input.sightImages?.[sightKey];
     let image: ImageRef | undefined;
     if (selectedUrl) {
       image = await saveSightImageFromUrl(selectedUrl, visit, city);

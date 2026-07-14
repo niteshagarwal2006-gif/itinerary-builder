@@ -383,7 +383,7 @@ function StepVisits({ state, setState, onNext, onBack }: {
   };
 
   async function loadPhotos(city: string, sight: string) {
-    const key = `${city}:${sight}`.toLowerCase();
+    const key = sightImageKey(city, sight);
     if (photos[key]?.length || photoLoading[key]) return;
     setPhotoLoading((p) => ({ ...p, [key]: true }));
     setPhotoError((p) => ({ ...p, [key]: "" }));
@@ -406,12 +406,16 @@ function StepVisits({ state, setState, onNext, onBack }: {
     }
   }
 
-  function selectPhoto(sight: string, url: string | null) {
+  function sightImageKey(city: string, sight: string): string {
+    return `${city}:${sight}`.toLowerCase().trim();
+  }
+
+  function selectPhoto(city: string, sight: string, url: string | null) {
     setState((s) => ({
       ...s,
       sightImages: {
         ...s.sightImages,
-        [sight.toLowerCase().trim()]: url ?? "",
+        [sightImageKey(city, sight)]: url ?? "",
       },
     }));
   }
@@ -489,8 +493,8 @@ function StepVisits({ state, setState, onNext, onBack }: {
                 <div className="mt-4 space-y-3 rounded-lg border border-line bg-cream/20 p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-ink/60">Photos</p>
                   {current.map((sight) => {
-                    const key = `${city}:${sight}`.toLowerCase();
-                    const chosen = state.sightImages[sight.toLowerCase().trim()];
+                    const key = sightImageKey(city, sight);
+                    const chosen = state.sightImages[key];
                     return (
                       <div key={sight} className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -511,7 +515,7 @@ function StepVisits({ state, setState, onNext, onBack }: {
                             <img src={chosen} alt={sight} className="h-16 w-24 rounded object-cover" />
                             <button
                               type="button"
-                              onClick={() => selectPhoto(sight, null)}
+                              onClick={() => selectPhoto(city, sight, null)}
                               className="text-xs text-red-600 underline"
                             >
                               Remove
@@ -525,7 +529,7 @@ function StepVisits({ state, setState, onNext, onBack }: {
                               <button
                                 key={photo.id}
                                 type="button"
-                                onClick={() => selectPhoto(sight, photo.url)}
+                                onClick={() => selectPhoto(city, sight, photo.url)}
                                 className={cn(
                                   "relative overflow-hidden rounded border-2 text-left transition-colors",
                                   chosen === photo.url ? "border-deep" : "border-transparent hover:border-gold"

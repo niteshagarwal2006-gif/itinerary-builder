@@ -79,30 +79,6 @@ async function renderStaticMapsRoute(cities: GeocodedCity[]): Promise<Buffer | n
   }
 }
 
-async function renderOsmStaticMapFallback(cities: GeocodedCity[]): Promise<Buffer | null> {
-  if (cities.length < 2) return null;
-
-  const centerLat = (Math.min(...cities.map((c) => c.coord.lat)) + Math.max(...cities.map((c) => c.coord.lat))) / 2;
-  const centerLon = (Math.min(...cities.map((c) => c.coord.lon)) + Math.max(...cities.map((c) => c.coord.lon))) / 2;
-
-  const markerParam = cities.map((c) => `${c.coord.lat.toFixed(4)},${c.coord.lon.toFixed(4)},ol-marker`).join("|");
-  const url =
-    `https://staticmap.openstreetmap.de/staticmap.php?` +
-    `center=${centerLat.toFixed(4)},${centerLon.toFixed(4)}` +
-    `&zoom=5` +
-    `&size=900x550` +
-    `&markers=${encodeURIComponent(markerParam)}`;
-
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-    if (!res.ok) return null;
-    const arrayBuffer = await res.arrayBuffer();
-    return Buffer.from(arrayBuffer);
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Generate a real geographic route map image for the given cities.
  * Results are cached by the ordered city list so the map is only rendered once.
@@ -132,10 +108,7 @@ export async function getRealRouteMapImage(
 
   if (geocoded.length < 2) return undefined;
 
-  let buffer = await renderStaticMapsRoute(geocoded);
-  if (!buffer) {
-    buffer = await renderOsmStaticMapFallback(geocoded);
-  }
+  const buffer = await renderStaticMapsRoute(geocoded);
   if (!buffer) return undefined;
 
   const rel = path.join("uploads", "generated", "route", `${key}.png`);
