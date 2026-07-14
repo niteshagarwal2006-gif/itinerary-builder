@@ -32,18 +32,27 @@ interface WizardState {
   sightImages: Record<string, string>;
 }
 
-function isValidDdmmyy(v: string): boolean {
-  return /^\d{6}$/.test(v.trim());
+function isValidDate(v: string): boolean {
+  return /^\d{2}-\d{2}-\d{4}$/.test(v.trim());
 }
 
-function parseDdmmyy(v: string): string | undefined {
+function parseDate(v: string): string | undefined {
   const s = v.trim();
-  if (!/^\d{6}$/.test(s)) return undefined;
-  const day = parseInt(s.slice(0, 2), 10);
-  const month = parseInt(s.slice(2, 4), 10);
-  const year = 2000 + parseInt(s.slice(4, 6), 10);
+  if (!/^\d{2}-\d{2}-\d{4}$/.test(s)) return undefined;
+  const [dayStr, monthStr, yearStr] = s.split("-");
+  const day = parseInt(dayStr ?? "", 10);
+  const month = parseInt(monthStr ?? "", 10);
+  const year = parseInt(yearStr ?? "", 10);
   const d = new Date(year, month - 1, day);
-  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return undefined;
+  if (
+    d.getFullYear() !== year ||
+    d.getMonth() !== month - 1 ||
+    d.getDate() !== day ||
+    year < 1900 ||
+    year > 2100
+  ) {
+    return undefined;
+  }
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
@@ -156,24 +165,28 @@ function StepTripBasics({ state, setState, onNext }: {
       </Field>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Travel dates" hint="Format: ddmmyy - ddmmyy (e.g. 140727 - 200727)">
+        <Field label="Travel dates" hint="Format: dd-mm-yyyy - dd-mm-yyyy (e.g. 14-07-2027 - 20-07-2027)">
           <TextInput
             value={state.dates}
             onChange={(v) => patch({ dates: v })}
-            placeholder="140727 - 200727"
+            placeholder="14-07-2027 - 20-07-2027"
           />
         </Field>
-        <Field label="Arrival date" hint="Format: ddmmyy. Used for weather and closure checks.">
+        <Field label="Arrival date" hint="Format: dd-mm-yyyy. Used for weather and closure checks.">
           <TextInput
             value={state.startDate}
             onChange={(v) => {
-              const digits = v.replace(/\D/g, "").slice(0, 6);
-              patch({ startDate: digits });
+              const digits = v.replace(/\D/g, "");
+              let formatted = v;
+              if (digits.length <= 2) formatted = digits;
+              else if (digits.length <= 4) formatted = `${digits.slice(0, 2)}-${digits.slice(2)}`;
+              else formatted = `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4, 8)}`;
+              patch({ startDate: formatted });
             }}
-            placeholder="140727"
+            placeholder="14-07-2027"
           />
-          {state.startDate && !isValidDdmmyy(state.startDate) && (
-            <p className="mt-1 text-xs text-red-600">Arrival date must be 6 digits: ddmmyy</p>
+          {state.startDate && !isValidDate(state.startDate) && (
+            <p className="mt-1 text-xs text-red-600">Arrival date must be dd-mm-yyyy</p>
           )}
         </Field>
       </div>
@@ -1012,7 +1025,7 @@ export default function WizardPage() {
         client: state.client,
         lang: state.lang,
         dates: state.dates,
-        startDate: parseDdmmyy(state.startDate),
+        startDate: parseDate(state.startDate),
         mealPlan: state.mealPlan,
         route: state.routeCities,
         nights: state.cityNights,
