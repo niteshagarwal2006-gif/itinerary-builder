@@ -1,7 +1,7 @@
 import "server-only";
 import { getDb } from "@/lib/db.server";
 
-export type MemoryCategory = "preference" | "route" | "hotel" | "feedback" | "sighting";
+export type MemoryCategory = "preference" | "route" | "hotel" | "feedback" | "sighting" | "flow";
 
 function get(category: MemoryCategory, key: string): unknown {
   const row = getDb()
@@ -110,4 +110,17 @@ export function recordSighting(city: string, title: string): void {
 export function suggestedSights(city: string): string[] {
   const data = get("sighting", city.toLowerCase()) as { titles: string[] } | undefined;
   return data?.titles ?? [];
+}
+
+/** Save the narrative flow / tone rules AI used, so future itineraries improve. */
+export function recordFlowStyle(rules: string): void {
+  const existing = (get("flow", "style") as { versions?: string[] } | undefined) ?? { versions: [] };
+  existing.versions = [rules, ...(existing.versions ?? [])].slice(0, 20);
+  set("flow", "style", existing);
+}
+
+/** Retrieve the most recent narrative flow guidance, if any. */
+export function getFlowStyle(): string | undefined {
+  const data = get("flow", "style") as { versions?: string[] } | undefined;
+  return data?.versions?.[0];
 }

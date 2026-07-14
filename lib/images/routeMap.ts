@@ -45,11 +45,18 @@ function titleCase(name: string): string {
     .join(" ");
 }
 
+function pinMarkerSvg(color = "#B8860B"): Buffer {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" viewBox="0 0 32 48">
+    <path d="M16 0C7.2 0 0 7.2 0 16c0 12 16 32 16 32s16-20 16-32c0-8.8-7.2-16-16-16z" fill="${color}" stroke="#FFFFFF" stroke-width="2"/>
+    <circle cx="16" cy="16" r="6" fill="#FFFFFF"/>
+  </svg>`;
+  return Buffer.from(svg);
+}
+
 async function renderStaticMapsRoute(cities: GeocodedCity[]): Promise<Buffer | null> {
   if (!StaticMaps) return null;
 
-  const coords: [number, number][] = cities.map((c) => [c.coord.lon, c.coord.lat]);
-  if (coords.length < 2) return null;
+  if (cities.length < 2) return null;
 
   const map = new StaticMaps({
     width: 900,
@@ -58,16 +65,32 @@ async function renderStaticMapsRoute(cities: GeocodedCity[]): Promise<Buffer | n
     tileSubdomains: ["a", "b", "c"],
   });
 
-  for (const c of coords) {
-    map.addCircle({
-      coord: c,
-      radius: 8000,
-      color: "#B8860B",
-      fill: "#B8860B66",
-      width: 2,
+  const pin = pinMarkerSvg();
+  for (const c of cities) {
+    const coord: [number, number] = [c.coord.lon, c.coord.lat];
+    map.addMarker({
+      coord,
+      img: pin,
+      height: 48,
+      width: 32,
+      offsetX: 16,
+      offsetY: 48,
+    });
+    // staticmaps type declarations don't expose addText, but the runtime does.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (map as any).addText({
+      coord,
+      text: titleCase(c.name),
+      color: "#1B2A2A",
+      fill: "#1B2A2A",
+      size: 13,
+      anchor: "middle",
+      offsetX: 0,
+      offsetY: 14,
     });
   }
 
+  const coords: [number, number][] = cities.map((c) => [c.coord.lon, c.coord.lat]);
   if (coords.length > 1) {
     map.addLine({ coords, color: "#B8860B", width: 3 });
   }

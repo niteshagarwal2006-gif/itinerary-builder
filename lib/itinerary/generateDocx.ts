@@ -12,6 +12,7 @@ import {
   TextRun,
   ExternalHyperlink,
   ImageRun,
+  Header,
   Table,
   TableRow,
   TableCell,
@@ -23,6 +24,8 @@ import {
   convertInchesToTwip,
   type IImageOptions,
 } from "docx";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import type { ImageRef, Itinerary, DayBlock, Sight } from "./types";
 import { legMapsUrl } from "./types";
 import { staySegment } from "./format";
@@ -96,6 +99,37 @@ function centeredImageParagraph(img: ResolvedImage, maxW: number, caption?: stri
     );
   }
   return out;
+}
+
+/** Build a section header from a local PNG asset. */
+function makeHeaderFromFile(
+  filePath: string,
+  naturalW: number,
+  naturalH: number,
+  maxW: number,
+  alignment: (typeof AlignmentType)[keyof typeof AlignmentType]
+): Header | undefined {
+  try {
+    const buffer = readFileSync(filePath);
+    const scaled = fit({ data: buffer, width: naturalW, height: naturalH, type: "png" }, maxW);
+    return new Header({
+      children: [
+        new Paragraph({
+          alignment,
+          spacing: { after: 0 },
+          children: [
+            new ImageRun({
+              data: buffer,
+              type: "png",
+              transformation: { width: scaled.width, height: scaled.height },
+            }),
+          ],
+        }),
+      ],
+    });
+  } catch {
+    return undefined;
+  }
 }
 
 const noBorder = { style: BorderStyle.NONE, size: 0, color: "auto" } as const;
@@ -278,13 +312,20 @@ function buildCover(it: Itinerary, imgs: Map<ImageRef, ResolvedImage>, S: DocStr
   return out;
 }
 
-function buildHighlights(it: Itinerary, S: DocStrings): (Paragraph)[] {
+function buildHighlights(it: Itinerary, imgs: Map<ImageRef, ResolvedImage>, S: DocStrings): (Paragraph | Table)[] {
   const items = it.highlights.filter((h) => h.trim());
   if (!items.length) return [];
-  const out: Paragraph[] = [
-    pageBreak(),
-    sectionHeading(S.highlights),
-  ];
+  const out: (Paragraph | Table)[] = [pageBreak()];
+  if (it.highlightsImage && imgs.has(it.highlightsImage)) {
+    out.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 200 },
+        children: [imageRun(imgs.get(it.highlightsImage)!, 560)],
+      })
+    );
+  }
+  out.push(sectionHeading(S.highlights));
   for (const h of items) {
     out.push(
       new Paragraph({
@@ -410,14 +451,14 @@ function buildDay(day: DayBlock, imgs: Map<ImageRef, ResolvedImage>, S: DocStrin
       out.push(
         new Paragraph({
           spacing: { before: 80, after: 80 },
-          shading: { fill: "FFF3CD" },
+          shading: { fill: "FCE4E4" },
           border: {
-            left: { style: BorderStyle.SINGLE, size: 12, color: "B8860B", space: 8 },
+            left: { style: BorderStyle.SINGLE, size: 12, color: "C00000", space: 8 },
           },
           indent: { left: 160 },
           children: [
-            new TextRun({ text: "⚠  ", bold: true, color: "B8860B", font: FONTS.body, size: 19 }),
-            new TextRun({ text: warn, italics: true, color: "7A5800", font: FONTS.body, size: 19 }),
+            new TextRun({ text: "⚠  ", bold: true, color: "C00000", font: FONTS.body, size: 19 }),
+            new TextRun({ text: warn, italics: true, color: "C00000", font: FONTS.body, size: 19 }),
           ],
         })
       );
@@ -454,8 +495,8 @@ function buildSight(s: Sight, imgs: Map<ImageRef, ResolvedImage>): (Paragraph | 
       new Paragraph({
         spacing: { before: 60, after: 120 },
         children: [
-          new TextRun({ text: "⚠ ", bold: true, color: "B8860B", font: FONTS.body, size: 19 }),
-          new TextRun({ text: s.closureNote, italics: true, color: "7A5800", font: FONTS.body, size: 19 }),
+          new TextRun({ text: "⚠ ", bold: true, color: "C00000", font: FONTS.body, size: 19 }),
+          new TextRun({ text: s.closureNote, italics: true, color: "C00000", font: FONTS.body, size: 19 }),
         ],
       })
     );
@@ -477,6 +518,7 @@ function collectRefs(it: Itinerary): ImageRef[] {
   const refs: ImageRef[] = [];
   if (it.logo) refs.push(it.logo);
   if (it.routeMap) refs.push(it.routeMap);
+  if (it.highlightsImage) refs.push(it.highlightsImage);
   for (const d of it.days) {
     if (d.cityImage) refs.push(d.cityImage);
     if (d.hotel?.image) refs.push(d.hotel.image);
@@ -513,9 +555,24 @@ export async function generateItineraryDocx(
 
   const children: (Paragraph | Table)[] = [
     ...buildCover(it, imgs, S),
-    ...buildHighlights(it, S),
+    ...buildHighlights(it, imgs, S),
   ];
   for (const day of it.days) children.push(...buildDay(day, imgs, S));
+
+  const headerFirst = makeHeaderFromFile(
+    path.join(process.cwd(), "public/assets/headers/header_first.png"),
+    1172,
+    170,
+    320,
+    AlignmentType.CENTER
+  );
+  const headerRest = makeHeaderFromFile(
+    path.join(process.cwd(), "public/assets/headers/header_rest.png"),
+    244,
+    140,
+    80,
+    AlignmentType.LEFT
+  );
 
   const doc = new Document({
     creator: "Itinerary Builder",
@@ -545,6 +602,11 @@ export async function generateItineraryDocx(
       {
         properties: {
           page: { margin: { top: 720, bottom: 720, left: 900, right: 900 } },
+          titlePage: true,
+        },
+        headers: {
+          first: headerFirst,
+          default: headerRest,
         },
         children,
       },

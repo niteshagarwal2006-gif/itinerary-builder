@@ -31,6 +31,21 @@ interface WizardState {
   sightImages: Record<string, string>;
 }
 
+function isValidDdmmyy(v: string): boolean {
+  return /^\d{6}$/.test(v.trim());
+}
+
+function parseDdmmyy(v: string): string | undefined {
+  const s = v.trim();
+  if (!/^\d{6}$/.test(s)) return undefined;
+  const day = parseInt(s.slice(0, 2), 10);
+  const month = parseInt(s.slice(2, 4), 10);
+  const year = 2000 + parseInt(s.slice(4, 6), 10);
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return undefined;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 function emptyState(): WizardState {
   let savedLang: Lang = "fr";
   try {
@@ -139,19 +154,25 @@ function StepTripBasics({ state, setState, onNext }: {
       </Field>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Travel dates" hint="e.g. 11 – 16 AVRIL 2027">
+        <Field label="Travel dates" hint="Format: ddmmyy - ddmmyy (e.g. 140727 - 200727)">
           <TextInput
             value={state.dates}
             onChange={(v) => patch({ dates: v })}
-            placeholder="11 – 16 AVRIL 2027"
+            placeholder="140727 - 200727"
           />
         </Field>
-        <Field label="Arrival date" hint="Optional. Used for weather and closure checks.">
+        <Field label="Arrival date" hint="Format: ddmmyy. Used for weather and closure checks.">
           <TextInput
-            type="date"
             value={state.startDate}
-            onChange={(v) => patch({ startDate: v })}
+            onChange={(v) => {
+              const digits = v.replace(/\D/g, "").slice(0, 6);
+              patch({ startDate: digits });
+            }}
+            placeholder="140727"
           />
+          {state.startDate && !isValidDdmmyy(state.startDate) && (
+            <p className="mt-1 text-xs text-red-600">Arrival date must be 6 digits: ddmmyy</p>
+          )}
         </Field>
       </div>
 
@@ -860,7 +881,7 @@ export default function WizardPage() {
         client: state.client,
         lang: state.lang,
         dates: state.dates,
-        startDate: state.startDate || undefined,
+        startDate: parseDdmmyy(state.startDate),
         mealPlan: state.mealPlan,
         route: state.routeCities,
         nights: state.cityNights,

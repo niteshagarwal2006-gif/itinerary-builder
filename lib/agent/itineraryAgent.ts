@@ -222,8 +222,8 @@ function backfillImages(it: Itinerary, lib: LibraryContext): Itinerary {
   return { ...it, days };
 }
 
-function addLegsAndClosures(it: Itinerary, input: AgentTripInput): Itinerary {
-  const days = it.days.map((d, i) => {
+async function addLegsAndClosures(it: Itinerary, input: AgentTripInput): Promise<Itinerary> {
+  const days = await Promise.all(it.days.map(async (d, i) => {
     const date = input.arrivalDate ? addDays(input.arrivalDate, i) : undefined;
     const weekday = date?.getUTCDay();
 
@@ -245,7 +245,7 @@ function addLegsAndClosures(it: Itinerary, input: AgentTripInput): Itinerary {
     const closureWarnings: string[] = [];
     if (weekday !== undefined) {
       for (const s of d.sights) {
-        const info = getClosureInfo(s.title);
+        const info = await getClosureInfo(s.title, d.city, input.lang);
         if (info && info.closedDays.includes(weekday)) {
           const dayName = weekdayName(date!, input.lang);
           const prefix = input.lang === "fr"
@@ -264,7 +264,7 @@ function addLegsAndClosures(it: Itinerary, input: AgentTripInput): Itinerary {
       date: d.date || (date ? formatPdfDate(date, input.lang) : undefined),
       closureWarnings: closureWarnings.length > 0 ? closureWarnings : d.closureWarnings,
     };
-  });
+  }));
   return { ...it, days };
 }
 
@@ -491,7 +491,7 @@ export async function buildItinerary(input: AgentTripInput): Promise<AgentResult
 
   let it = normalizeItinerary(raw, input);
   it = backfillImages(it, lib);
-  it = addLegsAndClosures(it, input);
+  it = await addLegsAndClosures(it, input);
 
   // Ensure route cities are unique and in order
   const routeCities: string[] = [];

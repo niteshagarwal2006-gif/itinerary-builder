@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import type { DayBlock, Hotel, ImageRef, Itinerary, Lang, Sight, TripSummary } from "@/lib/itinerary/types";
 import { ensureCityDescription } from "@/lib/agent/cityDescriptions";
-import { getSightImage, getWatercolorCityImage, saveSightImageFromUrl } from "@/lib/images/imageService";
+import { getHighlightsCollageImage, getSightImage, getWatercolorCityImage, saveSightImageFromUrl } from "@/lib/images/imageService";
 import { getRealRouteMapImage } from "@/lib/images/routeMap";
 import { checkSightOnDate } from "@/lib/closureDays";
 import { generateText, hasAiProvider } from "@/lib/ai/gemini";
 import { logActivity } from "@/lib/ai/log";
 import { getDb } from "@/lib/db.server";
 import { geocodeCities, calculateDistanceBetween, type DistanceResult, type GeoCoord } from "@/lib/geo";
-import { recordRoute, recordHotel } from "@/lib/memory";
+import { recordRoute, recordHotel, recordFlowStyle } from "@/lib/memory";
 import { addSuggestedSight } from "@/lib/citySights";
 
 export const runtime = "nodejs";
@@ -55,17 +55,25 @@ function upperCity(name: string): string {
   return name.trim().toUpperCase();
 }
 
+function titleCase(name: string): string {
+  return name
+    .split(/\s+/)
+    .map((w) => w.slice(0, 1).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 function addDays(iso: string, days: number): string {
   const d = new Date(iso + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
-function formatDateForDisplay(iso: string, lang: Lang): string {
+function formatDateForDisplay(iso: string): string {
   const d = new Date(iso + "T00:00:00Z");
-  const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
-  const locale = lang === "fr" ? "fr-FR" : lang === "de" ? "de-DE" : "en-GB";
-  return d.toLocaleDateString(locale, opts);
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const year = String(d.getUTCFullYear()).slice(-2);
+  return `${day}${month}${year}`;
 }
 
 const MEAL_PARTS: Record<Lang, { b: string; l: string; d: string; night: string }> = {
@@ -194,10 +202,75 @@ async function generateTransition(from: string, to: string, info: DistanceResult
   }
 }
 
+async function generateWarmFlow(
+  days: DayBlock[],
+  lang: Lang
+): Promise<{ days: DayBlock[]; styleRules: string }> {
+  if (!hasAiProvider() || days.length === 0) {
+    return { days, styleRules: "" };
+  }
+
+  const languageName = lang === "fr" ? "French" : lang === "en" ? "English" : "German";
+  const summary = days
+    .map(
+      (d, i) =>
+        `Day ${i + 1}: ${d.title}${d.date ? ` (${d.date})` : ""} | City: ${d.city} | ` +
+        `Sights: ${d.sights.map((s) => s.title).join(", ") || "none"} | ` +
+        `Current intro: ${d.intro || "(none)"}`
+    )
+    .join("\n");
+
+  const system =
+    "You are a senior luxury-travel writer. Rewrite the day intros so the whole itinerary reads as one warm, professional narrative. " +
+    "Keep each intro concise (2-4 sentences), mention the previous-to-next city flow when relevant, and make the journey feel connected. " +
+    "Return ONLY a valid JSON object with two fields: " +
+    "\"intros\" — an array of strings, one per day, in the same order as the input; " +
+    "\"styleRules\" — a short paragraph describing the tone and flow principles you applied (this will be saved to improve future itineraries).";
+  const prompt = `Rewrite these day intros in ${languageName}:\n${summary}`;
+  const cacheKey = `flow:${lang}:${days.map((d) => d.city).join("-")}`;
+  const start = Date.now();
+
+  try {
+    const raw = await generateText(system, prompt);
+    const parsed = JSON.parse(raw) as { intros?: string[]; styleRules?: string };
+    const intros = Array.isArray(parsed.intros) ? parsed.intros : [];
+    const styleRules = typeof parsed.styleRules === "string" ? parsed.styleRules : "";
+
+    const rewritten = days.map((d, i) => ({
+      ...d,
+      intro: intros[i]?.trim() || d.intro,
+    }));
+
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { dayCount: days.length, lang },
+      output: { styleRules, introPreviews: intros.map((t) => t.slice(0, 120)) },
+      savedTo: "memory:flow",
+      durationMs: Date.now() - start,
+      status: "success",
+    });
+
+    return { days: rewritten, styleRules };
+  } catch (err) {
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { dayCount: days.length, lang },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    return { days, styleRules: "" };
+  }
+}
+
 async function generateWeatherLine(city: string, isoDate: string, lang: Lang): Promise<string> {
   if (!hasAiProvider()) return "";
   const languageName = lang === "fr" ? "French" : lang === "en" ? "English" : "German";
-  const display = formatDateForDisplay(isoDate, lang);
+  const display = formatDateForDisplay(isoDate);
   const system = "You are a travel assistant. Provide a short, plausible weather note.";
   const prompt = `Give a short ${languageName} weather forecast summary for ${city}, India on ${display} (around that time of year). Format like "MÉTÉO: DELHI | 8–24°C | sunny and pleasant". Return only the line.`;
   const cacheKey = `weather:${lang}:${city}:${isoDate}`;
@@ -401,9 +474,13 @@ async function buildDayBlock(
     }
     let closureNote: string | undefined;
     if (day.isoDate) {
-      const check = checkSightOnDate(visit, day.isoDate);
+      const check = await checkSightOnDate(visit, day.isoDate, city, lang);
       if (check.closed) {
-        closureNote = `Closed on ${check.dayName}s. ${check.note ?? ""}`;
+        closureNote = lang === "fr"
+          ? `Fermé le ${check.dayName.toLowerCase()}. ${check.note ?? ""}`
+          : lang === "de"
+          ? `Geschlossen am ${check.dayName}. ${check.note ?? ""}`
+          : `Closed on ${check.dayName}s. ${check.note ?? ""}`;
       }
     }
     sights.push({
@@ -422,7 +499,7 @@ async function buildDayBlock(
   }
 
   // Date display
-  const date = day.isoDate ? formatDateForDisplay(day.isoDate, lang).toUpperCase() : undefined;
+  const date = day.isoDate ? formatDateForDisplay(day.isoDate) : undefined;
 
   return {
     id: randomUUID(),
@@ -509,9 +586,18 @@ export async function POST(req: NextRequest) {
   }
 
   // Build day blocks
-  const dayBlocks: DayBlock[] = await Promise.all(
+  let dayBlocks: DayBlock[] = await Promise.all(
     plannedDays.map((day) => buildDayBlock(day, input, cityIntros, cityCoords))
   );
+
+  // Polish the narrative flow so the whole trip reads professionally and warmly
+  try {
+    const { days: rewrittenDays, styleRules } = await generateWarmFlow(dayBlocks, lang);
+    dayBlocks = rewrittenDays;
+    if (styleRules) recordFlowStyle(styleRules);
+  } catch (err) {
+    console.error("Flow rewrite failed", err);
+  }
 
   // Attach watercolor city images to the first day of each city
   const seenCities = new Set<string>();
@@ -524,9 +610,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Highlights: first 2 visits per unique city
+  // Highlights: first 2 visits per unique city, described in one evocative sentence.
   const highlights: string[] = [];
-  const highlightPrefix = lang === "fr" ? "Visite de " : lang === "de" ? "Besuch von " : "Visit to ";
   const seenHighlightCities = new Set<string>();
   for (let i = 0; i < route.length && highlights.length < 8; i++) {
     const city = normCity(route[i]);
@@ -534,9 +619,20 @@ export async function POST(req: NextRequest) {
     seenHighlightCities.add(city);
     for (const v of (visits[i] ?? []).slice(0, 2)) {
       if (highlights.length >= 8) break;
-      highlights.push(`${highlightPrefix}${v}`);
+      const desc = await ensureSightDescription(v, city, lang);
+      const firstSentence = desc ? desc.split(/[.!?](\s|$)/, 1)[0].trim() : "";
+      if (firstSentence) {
+        const phrase = firstSentence.endsWith(".") ? firstSentence : `${firstSentence}.`;
+        highlights.push(`${v} — ${phrase}`);
+      } else {
+        const prefix = lang === "fr" ? "Découvrez " : lang === "de" ? "Entdecken Sie " : "Discover ";
+        highlights.push(`${prefix}${v} in ${titleCase(city)}.`);
+      }
     }
   }
+
+  // Watercolor highlights collage for the highlights page
+  const highlightsImage = await getHighlightsCollageImage(highlights);
 
   // Route map (real OSM geography, full ordered route including return legs)
   const routeMap = await getRealRouteMapImage(route.map(normCity));
@@ -562,6 +658,7 @@ export async function POST(req: NextRequest) {
     routeCities: route.map(upperCity),
     flightLegs: [],
     highlights,
+    highlightsImage: highlightsImage ?? undefined,
     routeMap: routeMap ?? undefined,
     days: dayBlocks,
   };

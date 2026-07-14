@@ -86,6 +86,19 @@ function initSchema(db: Database.Database): void {
       updated_at  TEXT NOT NULL
     );
 
+    -- Monument/sight weekly closure days, learned from static rules and AI.
+    -- Keyed by normalized sight title + city so future itineraries reuse the answer.
+    CREATE TABLE IF NOT EXISTS monument_closures (
+      id          TEXT PRIMARY KEY,
+      sight_title TEXT NOT NULL,
+      city        TEXT NOT NULL DEFAULT '',
+      closed_days TEXT NOT NULL,       -- JSON array of weekday numbers (0=Sun..6=Sat)
+      note        TEXT NOT NULL DEFAULT '',
+      source      TEXT NOT NULL DEFAULT 'ai', -- 'ai', 'static', 'manual'
+      updated_at  TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_monument_closures_title_city ON monument_closures(sight_title, city);
+
     -- AI activity log: every AI/web call, what was generated, and where it was saved.
     -- Used for audit, debugging, and to avoid repeating the same generation.
     CREATE TABLE IF NOT EXISTS ai_activity_log (

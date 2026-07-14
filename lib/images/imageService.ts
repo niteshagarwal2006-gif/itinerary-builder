@@ -265,3 +265,22 @@ export async function getRouteMapImage(cities: string[]): Promise<ImageRef | und
     skipWeb: true,
   });
 }
+
+/** Generate a watercolor collage of the top highlight sights for the highlights page. */
+export async function getHighlightsCollageImage(highlights: string[]): Promise<ImageRef | undefined> {
+  if (highlights.length === 0) return undefined;
+  const subjects = highlights.slice(0, 6).join("; ");
+  const key = highlights
+    .slice(0, 6)
+    .map((h) => h.replace(/[^a-z0-9]+/gi, "_").toLowerCase())
+    .join("-")
+    .slice(0, 80);
+  const prompt = `A soft watercolor travel collage illustration of iconic India landmarks and scenes: ${subjects}. Arranged as an elegant, artistic montage with subtle decorative arrows, warm pastel tones, dreamy atmosphere, no text, no labels, off-white background.`;
+  return getImage({
+    type: "watercolor",
+    key: `highlights:${key}`,
+    prompt,
+    caption: "Highlights",
+    skipWeb: true,
+  });
+}

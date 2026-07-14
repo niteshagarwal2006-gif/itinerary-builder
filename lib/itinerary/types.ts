@@ -132,6 +132,8 @@ export interface Itinerary {
   routeMap?: ImageRef;
   /** "LES POINTS FORTS DE VOTRE VOYAGE" bullets. */
   highlights: string[];
+  /** Watercolor collage image shown at the top of the highlights page. */
+  highlightsImage?: ImageRef;
   days: DayBlock[];
 }
 
