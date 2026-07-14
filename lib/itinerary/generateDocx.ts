@@ -147,7 +147,7 @@ function leftRightImageText(
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: caption ? 40 : 0 },
-      children: [imageRun(img, 55)],
+      children: [imageRun(img, 40)],
     }),
   ];
   if (caption) {
@@ -162,14 +162,14 @@ function leftRightImageText(
   }
 
   const imageCell = new TableCell({
-    width: { size: 20, type: WidthType.PERCENTAGE },
+    width: { size: 15, type: WidthType.PERCENTAGE },
     margins: { top: 60, bottom: 60, right: 80 },
     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
     children: imageCellContent,
   });
 
   const textCell = new TableCell({
-    width: { size: 80, type: WidthType.PERCENTAGE },
+    width: { size: 85, type: WidthType.PERCENTAGE },
     margins: { top: 60, bottom: 60, left: 80 },
     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
     verticalAlign: "center",
@@ -570,7 +570,7 @@ function buildSight(s: Sight, imgs: Map<ImageRef, ResolvedImage>): (Paragraph | 
     if (descParas.length) {
       return [titlePara, leftRightImageText(imgs.get(s.image)!, descParas, s.image.caption)];
     }
-    return [titlePara, ...centeredImageParagraph(imgs.get(s.image)!, 70, s.image.caption)];
+    return [titlePara, ...centeredImageParagraph(imgs.get(s.image)!, 45, s.image.caption)];
   }
 
   return [titlePara, ...descParas];

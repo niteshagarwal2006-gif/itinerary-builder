@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { Lang } from "@/lib/itinerary/types";
+import type { Lang, TimeOfDay } from "@/lib/itinerary/types";
 import { LANGS } from "@/lib/itinerary/types";
 import type { ReviewNote } from "@/app/api/assemble/route";
 import { Button, Field, NumberInput, TextInput, TextArea, cn } from "@/components/ui";
@@ -15,6 +15,11 @@ interface MealFlags { b: boolean; l: boolean; d: boolean }
 
 interface CityHotel { name: string; url: string }
 
+interface CityVisit {
+  title: string;
+  timeOfDay: TimeOfDay;
+}
+
 interface WizardState {
   client: string;
   lang: Lang;
@@ -24,7 +29,7 @@ interface WizardState {
   routeMode: "manual" | "ai";
   routeCities: string[];
   cityNights: number[];
-  cityVisits: string[][];
+  cityVisits: CityVisit[][];
   cityActivities: string[][];
   cityHotels: CityHotel[];
   includeWeather: boolean | null;
@@ -384,6 +389,12 @@ interface PexelsPhoto {
   alt: string;
 }
 
+const TIME_SLOTS: { key: TimeOfDay; label: string }[] = [
+  { key: "morning", label: "Morning" },
+  { key: "afternoon", label: "Afternoon" },
+  { key: "evening", label: "Evening" },
+];
+
 function StepVisits({ state, setState, onNext, onBack }: {
   state: WizardState;
   setState: React.Dispatch<React.SetStateAction<WizardState>>;
@@ -396,29 +407,73 @@ function StepVisits({ state, setState, onNext, onBack }: {
   const [photoLoading, setPhotoLoading] = useState<Record<string, boolean>>({});
   const [photoError, setPhotoError] = useState<Record<string, string>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [customInput, setCustomInput] = useState<Record<string, string>>({});
+  const [learning, setLearning] = useState<Record<string, boolean>>({});
 
-  const updateVisits = (idx: number, visits: string[]) => {
-    const seen = new Set<string>();
-    const unique = visits.filter((v) => {
-      const key = v.toLowerCase().trim();
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+  function sightImageKey(city: string, sight: string): string {
+    return `${city}:${sight}`.toLowerCase().trim();
+  }
+
+  function setVisits(cityIdx: number, updater: (prev: CityVisit[]) => CityVisit[]) {
     setState((s) => ({
       ...s,
-      cityVisits: s.cityVisits.map((v, i) => (i === idx ? unique : v)),
+      cityVisits: s.cityVisits.map((list, i) => (i === cityIdx ? updater(list || []) : list)),
     }));
-  };
+  }
 
-  const toggleVisit = (idx: number, visit: string) => {
-    const current = state.cityVisits[idx] || [];
-    const exists = current.map((v) => v.toLowerCase()).includes(visit.toLowerCase());
-    const next = exists
-      ? current.filter((v) => v.toLowerCase() !== visit.toLowerCase())
-      : [...current, visit];
-    updateVisits(idx, next);
-  };
+  function addVisit(cityIdx: number, title: string, timeOfDay: TimeOfDay) {
+    const clean = title.trim();
+    if (!clean) return;
+    setVisits(cityIdx, (prev) => {
+      if (prev.some((v) => v.title.toLowerCase() === clean.toLowerCase())) return prev;
+      return [...prev, { title: clean, timeOfDay }];
+    });
+  }
+
+  function removeVisit(cityIdx: number, title: string) {
+    setVisits(cityIdx, (prev) => prev.filter((v) => v.title.toLowerCase() !== title.toLowerCase()));
+  }
+
+  function moveVisit(cityIdx: number, title: string, direction: -1 | 1) {
+    const order: TimeOfDay[] = ["morning", "afternoon", "evening"];
+    setVisits(cityIdx, (prev) =>
+      prev.map((v) => {
+        if (v.title.toLowerCase() !== title.toLowerCase()) return v;
+        const idx = order.indexOf(v.timeOfDay);
+        const next = idx + direction;
+        if (next < 0 || next >= order.length) return v;
+        return { ...v, timeOfDay: order[next] };
+      })
+    );
+  }
+
+  async function learnCustomVisit(cityIdx: number, city: string, slot: TimeOfDay) {
+    const key = `${cityIdx}:${slot}`;
+    const title = customInput[key]?.trim();
+    if (!title) return;
+    setLearning((p) => ({ ...p, [key]: true }));
+    try {
+      const res = await fetch("/api/sights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city, title, lang: state.lang }),
+      });
+      const data = (await res.json()) as { title?: string; imageUrl?: string; error?: string };
+      if (!res.ok) {
+        console.error("Failed to learn sight:", data.error);
+      } else {
+        addVisit(cityIdx, data.title || title, slot);
+        if (data.imageUrl) {
+          selectPhoto(city, data.title || title, data.imageUrl);
+        }
+        setCustomInput((p) => ({ ...p, [key]: "" }));
+      }
+    } catch (err) {
+      console.error("Learn sight error:", err);
+    } finally {
+      setLearning((p) => ({ ...p, [key]: false }));
+    }
+  }
 
   async function loadPhotos(city: string, sight: string) {
     const key = sightImageKey(city, sight);
@@ -442,10 +497,6 @@ function StepVisits({ state, setState, onNext, onBack }: {
       setPhotoLoading((p) => ({ ...p, [key]: false }));
       setExpanded((p) => ({ ...p, [key]: true }));
     }
-  }
-
-  function sightImageKey(city: string, sight: string): string {
-    return `${city}:${sight}`.toLowerCase().trim();
   }
 
   function selectPhoto(city: string, sight: string, url: string | null) {
@@ -484,34 +535,29 @@ function StepVisits({ state, setState, onNext, onBack }: {
     <div className="space-y-5">
       <div>
         <h2 className="font-serif text-xl font-bold text-deep">Visits</h2>
-        <p className="text-sm text-ink/60">Pick suggested sights for each city, or type your own. Then choose a Pexels photo for each visit.</p>
+        <p className="text-sm text-ink/60">Choose sights for each time slot. Click a suggested sight to add it to Morning, then move it if needed. Type a custom visit to save it.</p>
       </div>
 
       <div className="space-y-4">
         {state.routeCities.map((city, i) => {
           const current = state.cityVisits[i] || [];
+          const selectedTitles = new Set(current.map((v) => v.title.toLowerCase()));
           return (
             <SectionCard key={i} title={`${city} — ${state.cityNights[i] || 0} night${state.cityNights[i] === 1 ? "" : "s"}`}>
-              <TextArea
-                value={current.join("\n")}
-                onChange={(v) => updateVisits(i, v.split("\n").map((l) => l.trim()).filter(Boolean))}
-                rows={3}
-                placeholder={`e.g.\nTaj Mahal\nAgra Fort`}
-              />
-
-              <div className="mt-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">Suggested sights</p>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink/60">Suggested sights</p>
                 {loading[i] ? (
                   <p className="text-sm text-ink/50">Loading suggestions…</p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {Array.from(new Set((suggestions[i] || []).map((s) => s.trim()))).map((sight) => {
-                      const selected = current.map((v) => v.toLowerCase()).includes(sight.toLowerCase());
+                      const selected = selectedTitles.has(sight.toLowerCase());
                       return (
                         <button
                           key={sight}
                           type="button"
-                          onClick={() => toggleVisit(i, sight)}
+                          onClick={() => !selected && addVisit(i, sight, "morning")}
+                          disabled={selected}
                           className={cn(
                             "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
                             selected
@@ -527,72 +573,107 @@ function StepVisits({ state, setState, onNext, onBack }: {
                 )}
               </div>
 
-              {current.length > 0 && (
-                <div className="mt-4 space-y-3 rounded-lg border border-line bg-cream/20 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-ink/60">Photos</p>
-                  {current.map((sight) => {
-                    const key = sightImageKey(city, sight);
-                    const chosen = state.sightImages[key];
-                    return (
-                      <div key={sight} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-ink">{sight}</span>
-                          <button
-                            type="button"
-                            onClick={() => loadPhotos(city, sight)}
-                            disabled={photoLoading[key]}
-                            className="text-xs font-medium text-gold underline hover:text-deep disabled:opacity-50"
-                          >
-                            {photoLoading[key] ? "Searching…" : chosen ? "Change photo" : "Find Pexels photo"}
-                          </button>
-                        </div>
-
-                        {chosen && (
-                          <div className="flex items-center gap-2">
-                            {/* eslint-disable-next-line @next/next/no-img-element -- external Pexels thumbnails */}
-                            <img src={chosen} alt={sight} className="h-16 w-24 rounded object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => selectPhoto(city, sight, null)}
-                              className="text-xs text-red-600 underline"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        )}
-
-                        {expanded[key] && photos[key] && photos[key].length > 0 && (
-                          <div className="grid grid-cols-4 gap-2">
-                            {photos[key].map((photo) => (
-                              <button
-                                key={photo.id}
-                                type="button"
-                                onClick={() => selectPhoto(city, sight, photo.url)}
-                                className={cn(
-                                  "relative overflow-hidden rounded border-2 text-left transition-colors",
-                                  chosen === photo.url ? "border-deep" : "border-transparent hover:border-gold"
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                {TIME_SLOTS.map((slot) => {
+                  const slotVisits = current.filter((v) => v.timeOfDay === slot.key);
+                  const inputKey = `${i}:${slot.key}`;
+                  return (
+                    <div key={slot.key} className="rounded-lg border border-line bg-cream/20 p-3">
+                      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-deep">{slot.label}</p>
+                      <div className="space-y-2">
+                        {slotVisits.map((visit) => {
+                          const key = sightImageKey(city, visit.title);
+                          const chosen = state.sightImages[key];
+                          return (
+                            <div key={visit.title} className="rounded border border-line bg-white p-2 text-sm">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium text-ink">{visit.title}</span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => moveVisit(i, visit.title, -1)}
+                                    className="px-1 text-xs text-ink/60 hover:text-deep disabled:opacity-30"
+                                    disabled={slot.key === "morning"}
+                                  >←</button>
+                                  <button
+                                    type="button"
+                                    onClick={() => moveVisit(i, visit.title, 1)}
+                                    className="px-1 text-xs text-ink/60 hover:text-deep disabled:opacity-30"
+                                    disabled={slot.key === "evening"}
+                                  >→</button>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeVisit(i, visit.title)}
+                                    className="px-1 text-xs text-red-600 hover:underline"
+                                  >×</button>
+                                </div>
+                              </div>
+                              <div className="mt-1 flex items-center gap-2">
+                                {chosen ? (
+                                  <>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={chosen} alt={visit.title} className="h-10 w-14 rounded object-cover" />
+                                    <button
+                                      type="button"
+                                      onClick={() => loadPhotos(city, visit.title)}
+                                      className="text-xs text-gold underline hover:text-deep"
+                                    >Change</button>
+                                  </>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => loadPhotos(city, visit.title)}
+                                    disabled={photoLoading[key]}
+                                    className="text-xs text-gold underline hover:text-deep disabled:opacity-50"
+                                  >{photoLoading[key] ? "Searching…" : "Add photo"}</button>
                                 )}
-                                title={`Photo by ${photo.photographer} on Pexels`}
-                              >
-                                {/* eslint-disable-next-line @next/next/no-img-element -- external Pexels thumbnails */}
-                                <img src={photo.thumb} alt={photo.alt || sight} className="h-16 w-full object-cover" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                              </div>
 
-                        {expanded[key] && photos[key] && photos[key].length === 0 && !photoLoading[key] && (
-                          <p className="text-xs text-ink/50">No Pexels photos found.</p>
-                        )}
-
-                        {photoError[key] && (
-                          <p className="text-xs text-red-600">{photoError[key]}</p>
-                        )}
+                              {expanded[key] && photos[key] && photos[key].length > 0 && (
+                                <div className="mt-2 grid grid-cols-4 gap-1">
+                                  {photos[key].map((photo) => (
+                                    <button
+                                      key={photo.id}
+                                      type="button"
+                                      onClick={() => selectPhoto(city, visit.title, photo.url)}
+                                      className={cn(
+                                        "relative overflow-hidden rounded border-2 text-left",
+                                        chosen === photo.url ? "border-deep" : "border-transparent hover:border-gold"
+                                      )}
+                                    >
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={photo.thumb} alt={photo.alt || visit.title} className="h-10 w-full object-cover" />
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              {expanded[key] && photos[key] && photos[key].length === 0 && !photoLoading[key] && (
+                                <p className="mt-1 text-xs text-ink/50">No Pexels photos found.</p>
+                              )}
+                              {photoError[key] && <p className="mt-1 text-xs text-red-600">{photoError[key]}</p>}
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+
+                      <div className="mt-2 flex gap-2">
+                        <TextInput
+                          value={customInput[inputKey] || ""}
+                          onChange={(v) => setCustomInput((p) => ({ ...p, [inputKey]: v }))}
+                          placeholder="Add custom visit"
+                          className="h-8 text-xs"
+                        />
+                        <Button
+                          onClick={() => learnCustomVisit(i, city, slot.key)}
+                          disabled={learning[inputKey] || !customInput[inputKey]?.trim()}
+                          variant="primary"
+                          className="h-8 px-2 text-xs"
+                        >{learning[inputKey] ? "…" : "Add"}</Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
               <p className="mt-2 text-xs text-ink/50">
                 {current.length} visit{current.length === 1 ? "" : "s"} added
@@ -621,6 +702,8 @@ function StepActivities({ state, setState, onNext, onBack }: {
 }) {
   const [suggestions, setSuggestions] = useState<Record<number, string[]>>({});
   const [loading, setLoading] = useState<Record<number, boolean>>({});
+  const [customInput, setCustomInput] = useState<Record<number, string>>({});
+  const [learning, setLearning] = useState<Record<number, boolean>>({});
 
   const updateActivities = (idx: number, activities: string[]) => {
     const seen = new Set<string>();
@@ -644,6 +727,30 @@ function StepActivities({ state, setState, onNext, onBack }: {
       : [...current, activity];
     updateActivities(idx, next);
   };
+
+  async function learnCustomActivity(idx: number, city: string) {
+    const title = customInput[idx]?.trim();
+    if (!title) return;
+    setLearning((p) => ({ ...p, [idx]: true }));
+    try {
+      const res = await fetch("/api/activities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city, title, lang: state.lang }),
+      });
+      const data = (await res.json()) as { title?: string; error?: string };
+      if (!res.ok) {
+        console.error("Failed to learn activity:", data.error);
+      } else {
+        updateActivities(idx, [...(state.cityActivities[idx] || []), data.title || title]);
+        setCustomInput((p) => ({ ...p, [idx]: "" }));
+      }
+    } catch (err) {
+      console.error("Learn activity error:", err);
+    } finally {
+      setLearning((p) => ({ ...p, [idx]: false }));
+    }
+  }
 
   useEffect(() => {
     async function loadSuggestions() {
@@ -671,7 +778,7 @@ function StepActivities({ state, setState, onNext, onBack }: {
     <div className="space-y-5">
       <div>
         <h2 className="font-serif text-xl font-bold text-deep">Activities & Experiences</h2>
-        <p className="text-sm text-ink/60">Pick suggested experiences for each city, or type your own. AI will write their descriptions.</p>
+        <p className="text-sm text-ink/60">Pick suggested experiences or add your own. Custom activities are saved with an AI-generated description.</p>
       </div>
 
       <div className="space-y-4">
@@ -679,15 +786,8 @@ function StepActivities({ state, setState, onNext, onBack }: {
           const current = state.cityActivities[i] || [];
           return (
             <SectionCard key={i} title={`${city} — ${state.cityNights[i] || 0} night${state.cityNights[i] === 1 ? "" : "s"}`}>
-              <TextArea
-                value={current.join("\n")}
-                onChange={(v) => updateActivities(i, v.split("\n").map((l) => l.trim()).filter(Boolean))}
-                rows={3}
-                placeholder={`e.g.\nRickshaw ride in Old Delhi\nCooking class with local family`}
-              />
-
-              <div className="mt-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">Suggested experiences</p>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink/60">Suggested experiences</p>
                 {loading[i] ? (
                   <p className="text-sm text-ink/50">Loading suggestions…</p>
                 ) : (
@@ -712,6 +812,42 @@ function StepActivities({ state, setState, onNext, onBack }: {
                     })}
                   </div>
                 )}
+              </div>
+
+              {current.length > 0 && (
+                <div className="mt-3 rounded-lg border border-line bg-cream/20 p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">Selected</p>
+                  <div className="flex flex-wrap gap-2">
+                    {current.map((activity) => (
+                      <span
+                        key={activity}
+                        className="inline-flex items-center gap-1 rounded-full border border-line bg-white px-3 py-1 text-xs"
+                      >
+                        {activity}
+                        <button
+                          type="button"
+                          onClick={() => toggleActivity(i, activity)}
+                          className="text-red-600 hover:underline"
+                        >×</button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-3 flex gap-2">
+                <TextInput
+                  value={customInput[i] || ""}
+                  onChange={(v) => setCustomInput((p) => ({ ...p, [i]: v }))}
+                  placeholder="Add custom activity"
+                  className="h-8 text-xs"
+                />
+                <Button
+                  onClick={() => learnCustomActivity(i, city)}
+                  disabled={learning[i] || !customInput[i]?.trim()}
+                  variant="primary"
+                  className="h-8 px-2 text-xs"
+                >{learning[i] ? "…" : "Add"}</Button>
               </div>
 
               <p className="mt-2 text-xs text-ink/50">

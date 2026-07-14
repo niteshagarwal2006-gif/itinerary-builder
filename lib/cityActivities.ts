@@ -1,8 +1,9 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { getDb } from "./db.server";
-import { generateJson, hasAiProvider } from "./ai/gemini";
+import { generateJson, generateText, hasAiProvider } from "./ai/gemini";
 import { logActivity } from "./ai/log";
+import type { Lang } from "./itinerary/types";
 
 /**
  * Default suggested activities/experiences for major Indian cities.
@@ -159,4 +160,77 @@ export function saveActivityDescription(title: string, city: string, lang: strin
       .prepare("INSERT INTO activities (id, title, city, description, lang, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
       .run(randomUUID(), title, normalizeCity(city), description, lang, new Date().toISOString());
   }
+}
+
+function languageName(lang: Lang): string {
+  return lang === "fr" ? "French" : lang === "en" ? "English" : "German";
+}
+
+async function generateActivityDescription(title: string, city: string, lang: Lang): Promise<string> {
+  if (!hasAiProvider()) return "";
+  const system = "You are a luxury travel writer for the Indian subcontinent. Write concise, evocative descriptions.";
+  const prompt = `Write a 2-3 sentence description in ${languageName(lang)} for the activity "${title}" in ${city}, India, suitable for a high-end travel itinerary. Return only the description, no labels.`;
+  const cacheKey = `activity-desc:${lang}:${city}:${title}`;
+  const start = Date.now();
+  try {
+    const text = (await generateText(system, prompt)).trim();
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { title, city, lang, prompt },
+      output: { length: text.length, preview: text.slice(0, 200) },
+      durationMs: Date.now() - start,
+      status: "success",
+    });
+    return text;
+  } catch (err) {
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { title, city, lang, prompt },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    return "";
+  }
+}
+
+export async function ensureActivityDescription(title: string, city: string, lang: Lang): Promise<string> {
+  const cached = getCachedActivityDescription(title, city, lang);
+  if (cached?.trim()) {
+    logActivity({
+      category: "text",
+      provider: "cache",
+      cacheKey: `activity-desc:${lang}:${city}:${title}`,
+      input: { title, city, lang },
+      output: { length: cached.length, preview: cached.slice(0, 200) },
+      savedTo: "activities",
+      status: "cached",
+    });
+    return cached;
+  }
+  const desc = await generateActivityDescription(title, city, lang);
+  if (desc) saveActivityDescription(title, city, lang, desc);
+  return desc;
+}
+
+export interface LearnedActivity {
+  title: string;
+  description: string;
+}
+
+/**
+ * Learn a custom activity: store it and generate a description.
+ * Safe to call multiple times — cached values are returned after the first run.
+ */
+export async function learnActivity(title: string, city: string, lang: Lang): Promise<LearnedActivity> {
+  addSuggestedActivity(city, title);
+  const description = await ensureActivityDescription(title, city, lang);
+  return {
+    title: title.trim(),
+    description,
+  };
 }

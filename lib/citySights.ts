@@ -1,8 +1,10 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db.server";
-import { generateJson, hasAiProvider } from "@/lib/ai/gemini";
+import { generateJson, generateText, hasAiProvider } from "@/lib/ai/gemini";
 import { logActivity } from "@/lib/ai/log";
+import { getSightImage } from "./images/imageService";
+import type { Lang } from "./itinerary/types";
 
 /**
  * Default suggested sights for major Indian cities.
@@ -309,10 +311,115 @@ export async function getSuggestedSights(city: string): Promise<string[]> {
 /**
  * Add a sight to the city's suggestion list (called when user adds a custom visit).
  */
+
+
+/**
+ * Add a sight to the city's suggestion list (called when user adds a custom visit).
+ */
 export function addSuggestedSight(city: string, title: string): void {
   getDb()
     .prepare(
       "INSERT OR IGNORE INTO sights (id, title, city, lang, updated_at) VALUES (?, ?, ?, ?, ?)"
     )
     .run(randomUUID(), title.trim(), normalizeCity(city), "en", new Date().toISOString());
+}
+
+function languageName(lang: Lang): string {
+  return lang === "fr" ? "French" : lang === "en" ? "English" : "German";
+}
+
+export function getCachedSightDescription(title: string, city: string, lang: Lang): string | undefined {
+  const row = getDb()
+    .prepare("SELECT description FROM sights WHERE title = ? AND city = ? AND lang = ?")
+    .get(title, normalizeCity(city), lang) as { description: string | null } | undefined;
+  return row?.description ?? undefined;
+}
+
+export function saveSightDescription(title: string, city: string, lang: Lang, description: string): void {
+  const existing = getDb()
+    .prepare("SELECT id FROM sights WHERE title = ? AND city = ? AND lang = ?")
+    .get(title, normalizeCity(city), lang) as { id: string } | undefined;
+  if (existing) {
+    getDb()
+      .prepare("UPDATE sights SET description = ?, updated_at = ? WHERE id = ?")
+      .run(description, new Date().toISOString(), existing.id);
+  } else {
+    getDb()
+      .prepare("INSERT INTO sights (id, title, city, description, lang, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(randomUUID(), title, normalizeCity(city), description, lang, new Date().toISOString());
+  }
+}
+
+async function generateVisitDescription(title: string, city: string, lang: Lang): Promise<string> {
+  if (!hasAiProvider()) return "";
+  const system = "You are a luxury travel writer for the Indian subcontinent. Write concise, evocative descriptions.";
+  const prompt = `Write a 2-3 sentence description in ${languageName(lang)} for "${title}" in ${city}, India, suitable for a high-end travel itinerary. Return only the description, no labels.`;
+  const cacheKey = `desc:${lang}:${city}:${title}`;
+  const start = Date.now();
+  try {
+    const text = (await generateText(system, prompt)).trim();
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { title, city, lang, prompt },
+      output: { length: text.length, preview: text.slice(0, 200) },
+      durationMs: Date.now() - start,
+      status: "success",
+    });
+    return text;
+  } catch (err) {
+    logActivity({
+      category: "text",
+      provider: "gemini",
+      cacheKey,
+      input: { title, city, lang, prompt },
+      durationMs: Date.now() - start,
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    return "";
+  }
+}
+
+export async function ensureSightDescription(title: string, city: string, lang: Lang): Promise<string> {
+  const cached = getCachedSightDescription(title, city, lang);
+  if (cached?.trim()) {
+    logActivity({
+      category: "text",
+      provider: "cache",
+      cacheKey: `desc:${lang}:${city}:${title}`,
+      input: { title, city, lang },
+      output: { length: cached.length, preview: cached.slice(0, 200) },
+      savedTo: "sights",
+      status: "cached",
+    });
+    return cached;
+  }
+  const desc = await generateVisitDescription(title, city, lang);
+  if (desc) saveSightDescription(title, city, lang, desc);
+  return desc;
+}
+
+export interface LearnedSight {
+  title: string;
+  description: string;
+  imageUrl?: string;
+}
+
+/**
+ * Learn a custom sight: store it, generate a description, and fetch an image.
+ * Safe to call multiple times — cached values are returned after the first run.
+ */
+export async function learnSight(title: string, city: string, lang: Lang): Promise<LearnedSight> {
+  addSuggestedSight(city, title);
+  const [description, image] = await Promise.all([
+    ensureSightDescription(title, city, lang),
+    getSightImage(title, city),
+  ]);
+  return {
+    title: title.trim(),
+    description,
+    imageUrl: image?.url,
+  };
 }

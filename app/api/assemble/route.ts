@@ -7,15 +7,13 @@ import { getRealRouteMapImage } from "@/lib/images/routeMap";
 import { checkSightOnDate } from "@/lib/closureDays";
 import {
   addSuggestedActivity,
-  getCachedActivityDescription,
-  saveActivityDescription,
+  ensureActivityDescription,
 } from "@/lib/cityActivities";
 import { generateText, hasAiProvider } from "@/lib/ai/gemini";
 import { logActivity } from "@/lib/ai/log";
-import { getDb } from "@/lib/db.server";
 import { geocodeCities, calculateDistanceBetween, type DistanceResult, type GeoCoord } from "@/lib/geo";
 import { recordRoute, recordHotel, recordFlowStyle } from "@/lib/memory";
-import { addSuggestedSight } from "@/lib/citySights";
+import { addSuggestedSight, ensureSightDescription } from "@/lib/citySights";
 
 export const runtime = "nodejs";
 
@@ -26,6 +24,11 @@ interface MealFlags { b: boolean; l: boolean; d: boolean }
 
 interface CityHotel { name: string; url: string }
 
+interface CityVisitInput {
+  title: string;
+  timeOfDay: import("@/lib/itinerary/types").TimeOfDay;
+}
+
 interface AssembleInput {
   client: string;
   lang: Lang;
@@ -34,7 +37,7 @@ interface AssembleInput {
   mealPlan: MealFlags;
   route: string[];
   nights: number[];
-  visits: string[][];
+  visits: CityVisitInput[][];
   activities: string[][];
   hotels: CityHotel[];
   includeWeather: boolean;
@@ -141,39 +144,6 @@ function formatLegText(info: DistanceResult | null): string {
 // ---------------------------------------------------------------------------
 // AI helpers
 // ---------------------------------------------------------------------------
-async function generateVisitDescription(title: string, city: string, lang: Lang): Promise<string> {
-  if (!hasAiProvider()) return "";
-  const languageName = lang === "fr" ? "French" : lang === "en" ? "English" : "German";
-  const system = "You are a luxury travel writer for the Indian subcontinent. Write concise, evocative descriptions.";
-  const prompt = `Write a 2-3 sentence description in ${languageName} for "${title}" in ${city}, India, suitable for a high-end travel itinerary. Return only the description, no labels.`;
-  const cacheKey = `desc:${lang}:${city}:${title}`;
-  const start = Date.now();
-  try {
-    const text = (await generateText(system, prompt)).trim();
-    logActivity({
-      category: "text",
-      provider: "gemini",
-      cacheKey,
-      input: { title, city, lang, prompt },
-      output: { length: text.length, preview: text.slice(0, 200) },
-      durationMs: Date.now() - start,
-      status: "success",
-    });
-    return text;
-  } catch (err) {
-    logActivity({
-      category: "text",
-      provider: "gemini",
-      cacheKey,
-      input: { title, city, lang, prompt },
-      durationMs: Date.now() - start,
-      status: "error",
-      errorMessage: err instanceof Error ? err.message : String(err),
-    });
-    return "";
-  }
-}
-
 async function generateTransition(from: string, to: string, info: DistanceResult | null, lang: Lang): Promise<string> {
   if (!hasAiProvider()) return "";
   const languageName = lang === "fr" ? "French" : lang === "en" ? "English" : "German";
@@ -308,102 +278,6 @@ async function generateWeatherLine(city: string, isoDate: string, lang: Lang): P
 }
 
 // ---------------------------------------------------------------------------
-// Sight description cache
-// ---------------------------------------------------------------------------
-function getCachedSight(title: string, city: string, lang: Lang): string | undefined {
-  const row = getDb()
-    .prepare("SELECT description FROM sights WHERE title = ? AND city = ? AND lang = ?")
-    .get(title, city, lang) as { description: string | null } | undefined;
-  return row?.description ?? undefined;
-}
-
-function saveSightDescription(title: string, city: string, lang: Lang, description: string): void {
-  const existing = getDb()
-    .prepare("SELECT id FROM sights WHERE title = ? AND city = ? AND lang = ?")
-    .get(title, city, lang) as { id: string } | undefined;
-  if (existing) {
-    getDb()
-      .prepare("UPDATE sights SET description = ?, updated_at = ? WHERE id = ?")
-      .run(description, new Date().toISOString(), existing.id);
-  } else {
-    getDb()
-      .prepare("INSERT INTO sights (id, title, city, description, lang, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(randomUUID(), title, city, description, lang, new Date().toISOString());
-  }
-}
-
-async function ensureSightDescription(title: string, city: string, lang: Lang): Promise<string> {
-  const cached = getCachedSight(title, city, lang);
-  if (cached?.trim()) {
-    logActivity({
-      category: "text",
-      provider: "cache",
-      cacheKey: `desc:${lang}:${city}:${title}`,
-      input: { title, city, lang },
-      output: { length: cached.length, preview: cached.slice(0, 200) },
-      savedTo: "sights",
-      status: "cached",
-    });
-    return cached;
-  }
-  const desc = await generateVisitDescription(title, city, lang);
-  if (desc) saveSightDescription(title, city, lang, desc);
-  return desc;
-}
-
-async function generateActivityDescription(title: string, city: string, lang: Lang): Promise<string> {
-  if (!hasAiProvider()) return "";
-  const languageName = lang === "fr" ? "French" : lang === "en" ? "English" : "German";
-  const system = "You are a luxury travel writer for the Indian subcontinent. Write concise, evocative descriptions.";
-  const prompt = `Write a 2-3 sentence description in ${languageName} for the activity "${title}" in ${city}, India, suitable for a high-end travel itinerary. Return only the description, no labels.`;
-  const cacheKey = `activity-desc:${lang}:${city}:${title}`;
-  const start = Date.now();
-  try {
-    const text = (await generateText(system, prompt)).trim();
-    logActivity({
-      category: "text",
-      provider: "gemini",
-      cacheKey,
-      input: { title, city, lang, prompt },
-      output: { length: text.length, preview: text.slice(0, 200) },
-      durationMs: Date.now() - start,
-      status: "success",
-    });
-    return text;
-  } catch (err) {
-    logActivity({
-      category: "text",
-      provider: "gemini",
-      cacheKey,
-      input: { title, city, lang, prompt },
-      durationMs: Date.now() - start,
-      status: "error",
-      errorMessage: err instanceof Error ? err.message : String(err),
-    });
-    return "";
-  }
-}
-
-async function ensureActivityDescription(title: string, city: string, lang: Lang): Promise<string> {
-  const cached = getCachedActivityDescription(title, city, lang);
-  if (cached?.trim()) {
-    logActivity({
-      category: "text",
-      provider: "cache",
-      cacheKey: `activity-desc:${lang}:${city}:${title}`,
-      input: { title, city, lang },
-      output: { length: cached.length, preview: cached.slice(0, 200) },
-      savedTo: "activities",
-      status: "cached",
-    });
-    return cached;
-  }
-  const desc = await generateActivityDescription(title, city, lang);
-  if (desc) saveActivityDescription(title, city, lang, desc);
-  return desc;
-}
-
-// ---------------------------------------------------------------------------
 // Build itinerary
 // ---------------------------------------------------------------------------
 interface PlannedDay {
@@ -412,7 +286,7 @@ interface PlannedDay {
   nightInCity: number; // 1-based within city
   totalNightsInCity: number;
   hotel: CityHotel;
-  visits: string[];
+  visits: CityVisitInput[];
   activities: string[];
   isoDate?: string;
   prevCity: string | null;
@@ -431,6 +305,19 @@ function dedupeStrings(items: string[], duplicates: string[]): string[] {
   });
 }
 
+function dedupeVisits(items: CityVisitInput[], duplicates: string[]): CityVisitInput[] {
+  const seen = new Set<string>();
+  return items.filter((v) => {
+    const key = normCity(v.title);
+    if (!key || seen.has(key)) {
+      if (!duplicates.includes(v.title)) duplicates.push(v.title);
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 function planDays(input: AssembleInput): { days: PlannedDay[]; duplicates: string[] } {
   const days: PlannedDay[] = [];
   let dayIndex = 0;
@@ -440,7 +327,7 @@ function planDays(input: AssembleInput): { days: PlannedDay[]; duplicates: strin
   for (let cityIdx = 0; cityIdx < route.length; cityIdx++) {
     const city = normCity(route[cityIdx]);
     const n = nights[cityIdx] ?? 0;
-    const cityVisits = dedupeStrings(visits[cityIdx] ?? [], duplicates);
+    const cityVisits = dedupeVisits(visits[cityIdx] ?? [], duplicates);
     const cityActivities = dedupeStrings(activities[cityIdx] ?? [], duplicates);
     const hotel = hotels[cityIdx] ?? { name: "", url: "" };
 
@@ -449,8 +336,8 @@ function planDays(input: AssembleInput): { days: PlannedDay[]; duplicates: strin
     const daysForCity = n === 0 && cityIdx === route.length - 1 ? 1 : n;
     const prevCity = cityIdx === 0 ? null : normCity(route[cityIdx - 1]);
 
-    // Distribute visits and activities across days in this city
-    const perDayVisits: string[][] = Array.from({ length: daysForCity }, () => []);
+    // Distribute visits across days, preserving time-of-day assignment
+    const perDayVisits: CityVisitInput[][] = Array.from({ length: daysForCity }, () => []);
     for (let i = 0; i < cityVisits.length; i++) {
       perDayVisits[i % daysForCity].push(cityVisits[i]);
     }
@@ -531,20 +418,20 @@ async function buildDayBlock(
 
   // Sights with descriptions, images and closure notes (parallel per day)
   const sights: Sight[] = await Promise.all(
-    day.visits.map(async (visit, idx) => {
-      const desc = await ensureSightDescription(visit, city, lang);
-      const sightKey = `${city}:${visit}`.toLowerCase().trim();
+    day.visits.map(async (visit) => {
+      const desc = await ensureSightDescription(visit.title, city, lang);
+      const sightKey = `${city}:${visit.title}`.toLowerCase().trim();
       const selectedUrl = input.sightImages?.[sightKey];
       let image: ImageRef | undefined;
       if (selectedUrl) {
-        image = await saveSightImageFromUrl(selectedUrl, visit, city);
+        image = await saveSightImageFromUrl(selectedUrl, visit.title, city);
       }
       if (!image) {
-        image = await getSightImage(visit, city);
+        image = await getSightImage(visit.title, city);
       }
       let closureNote: string | undefined;
       if (day.isoDate) {
-        const check = await checkSightOnDate(visit, day.isoDate, city, lang);
+        const check = await checkSightOnDate(visit.title, day.isoDate, city, lang);
         if (check.closed) {
           closureNote = lang === "fr"
             ? `Fermé le ${check.dayName.toLowerCase()}. ${check.note ?? ""}`
@@ -553,15 +440,13 @@ async function buildDayBlock(
             : `Closed on ${check.dayName}s. ${check.note ?? ""}`;
         }
       }
-      const slotIndex = idx % 3;
-      const timeOfDay: import("@/lib/itinerary/types").TimeOfDay = slotIndex === 0 ? "morning" : slotIndex === 1 ? "afternoon" : "evening";
       return {
         id: randomUUID(),
-        title: visit.toUpperCase(),
+        title: visit.title.toUpperCase(),
         description: desc,
         image,
         closureNote,
-        timeOfDay,
+        timeOfDay: visit.timeOfDay,
       };
     })
   );
@@ -641,7 +526,7 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < route.length; i++) {
       const h = hotels[i];
       if (h?.name.trim()) recordHotel(normCity(route[i]), h.name.trim(), h.url.trim() || undefined);
-      for (const v of visits[i] ?? []) addSuggestedSight(normCity(route[i]), v);
+      for (const v of visits[i] ?? []) addSuggestedSight(normCity(route[i]), v.title);
       for (const a of activities[i] ?? []) addSuggestedActivity(normCity(route[i]), a);
     }
   } catch (err) {
@@ -710,14 +595,14 @@ export async function POST(req: NextRequest) {
     seenHighlightCities.add(city);
     for (const v of (visits[i] ?? []).slice(0, 2)) {
       if (highlights.length >= 8) break;
-      const desc = await ensureSightDescription(v, city, lang);
+      const desc = await ensureSightDescription(v.title, city, lang);
       const firstSentence = desc ? desc.split(/[.!?](\s|$)/, 1)[0].trim() : "";
       if (firstSentence) {
         const phrase = firstSentence.endsWith(".") ? firstSentence : `${firstSentence}.`;
-        highlights.push(`${v} — ${phrase}`);
+        highlights.push(`${v.title} — ${phrase}`);
       } else {
         const prefix = lang === "fr" ? "Découvrez " : lang === "de" ? "Entdecken Sie " : "Discover ";
-        highlights.push(`${prefix}${v} in ${titleCase(city)}.`);
+        highlights.push(`${prefix}${v.title} in ${titleCase(city)}.`);
       }
     }
   }
@@ -793,7 +678,7 @@ async function reviewItinerary(it: Itinerary, plannedDays: PlannedDay[], duplica
   if (!hasAiProvider()) return notes;
 
   const daysSummary = plannedDays
-    .map((d, i) => `JOUR ${i + 1}: ${d.city} — ${d.visits.join(", ") || "no visits"}`)
+    .map((d, i) => `JOUR ${i + 1}: ${d.city} — ${d.visits.map((v) => v.title).join(", ") || "no visits"}`)
     .join("\n");
 
   const system =
